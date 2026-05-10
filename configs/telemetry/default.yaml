@@ -1,0 +1,27 @@
+# Telemetry Configuration
+# =======================
+
+metrics:
+  enabled: true
+  collection_interval: 10
+  retention_minutes: 60
+  export_format: "prometheus"
+
+tracing:
+  enabled: true
+  max_traces: 1000
+  trace_sampling_rate: 0.1
+
+analytics:
+  enabled: true
+  analysis_interval: 300
+  trend_days: 30
+  seasonality_detection: true
+
+logging:
+  level: "INFO"
+  format: "json"
+  output: [ "console", "file" ]
+  file_path: "./logs/huntermind.log"
+  max_size_mb: 100
+  backup_count: 5

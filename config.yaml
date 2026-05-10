@@ -1,0 +1,119 @@
+# HunterMind Platform Configuration
+# =================================
+
+platform:
+  name: "HunterMind"
+  version: "1.0.0"
+  mode: "research"  # research, production, stealth
+  debug: false
+  log_level: "INFO"
+
+# API Configuration
+api:
+  host: "0.0.0.0"
+  port: 8000
+  websocket_port: 8001
+  grpc_port: 50051
+  workers: 4
+  cors_origins: ["*"]
+
+# Dashboard Configuration
+dashboard:
+  host: "0.0.0.0"
+  port: 5000
+  monitor_port: 5001
+  visualizer_port: 5002
+  cognitive_port: 5003
+
+# Database Configuration
+database:
+  type: "sqlite"  # sqlite, postgres
+  sqlite_path: "./storage/sqlite/huntermind.db"
+  postgres_url: "postgresql://huntermind:huntermind123@localhost:5432/huntermind"
+  max_connections: 10
+  pool_size: 5
+
+# Vector Database
+vector_db:
+  type: "faiss"  # faiss, annoy
+  dimension: 768
+  index_path: "./storage/vector_db/index.faiss"
+
+# Graph Database
+graph_db:
+  enabled: true
+  storage_path: "./storage/graph_db/graph.db"
+
+# Object Storage
+storage:
+  object_storage_path: "./storage/object_storage"
+  max_file_size_mb: 100
+  chunk_size_mb: 10
+
+# Checkpoints
+checkpoints:
+  enabled: true
+  path: "./storage/checkpoints"
+  interval_minutes: 60
+  max_checkpoints: 50
+
+# Orchestration
+orchestration:
+  max_concurrent_tasks: 10
+  task_timeout: 300
+  task_retries: 3
+  distributed_mode: false
+
+# Cognition
+cognition:
+  brain_loop_interval: 0.5
+  memory_ttl: 3600
+  max_memory_items: 10000
+  reasoning_depth: 5
+
+# Learning
+learning:
+  meta_learning_enabled: true
+  rl_epsilon: 0.1
+  rl_gamma: 0.95
+  rl_learning_rate: 0.001
+  batch_size: 32
+  replay_buffer_size: 10000
+
+# Offensive
+offensive:
+  max_requests_per_second: 10
+  stealth_level: "high"
+  payloads_enabled: true
+  max_payloads_per_scan: 100
+  scan_timeout: 300
+
+# Infrastructure
+infrastructure:
+  browser_pool_size: 3
+  headless: true
+  proxy_enabled: false
+  sandbox_enabled: true
+
+# Telemetry
+telemetry:
+  metrics_enabled: true
+  tracing_enabled: true
+  export_interval: 60
+  retention_days: 7
+
+# Security
+security:
+  auth_required: false
+  api_key_required: false
+  rate_limit_enabled: true
+  max_requests_per_ip: 100
+  jwt_secret: "your-secret-key-change-this"
+  jwt_expiry_hours: 24
+
+# Redis (optional)
+redis:
+  enabled: false
+  host: "localhost"
+  port: 6379
+  db: 0

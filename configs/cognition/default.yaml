@@ -1,0 +1,44 @@
+# Cognition Configuration
+# =======================
+
+brain:
+  loop_interval: 0.5
+  max_cycle_duration: 10.0
+  decision_timeout: 5.0
+
+memory:
+  episodic:
+    max_size: 10000
+    retention_days: 30
+  semantic:
+    max_concepts: 5000
+  working:
+    capacity: 20
+    ttl: 300
+  procedural:
+    max_procedures: 500
+
+knowledge:
+  graph_enabled: true
+  max_nodes: 10000
+  max_edges: 50000
+
+reasoning:
+  max_depth: 5
+  uncertainty_threshold: 0.3
+  confidence_threshold: 0.7
+
+planning:
+  max_plan_steps: 10
+  plan_timeout: 60
+  parallel_execution: true
+
+reflection:
+  enabled: true
+  reflection_interval: 300
+  max_insights: 100
+
+self_improvement:
+  enabled: true
+  adaptation_interval: 3600
+  learning_rate: 0.01

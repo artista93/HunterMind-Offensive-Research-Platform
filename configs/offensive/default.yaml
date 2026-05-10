@@ -1,0 +1,51 @@
+# Offensive Configuration
+# =======================
+
+scanners:
+  xss:
+    enabled: true
+    payloads: ["basic", "advanced", "dom"]
+  sqli:
+    enabled: true
+    techniques: ["boolean", "time", "error", "union"]
+  idor:
+    enabled: true
+    max_ids_to_test: 20
+
+payloads:
+  generator:
+    max_payloads: 100
+    encoding_types: ["url", "html", "base64", "hex"]
+  mutator:
+    enabled: true
+    mutation_rate: 0.3
+  ranker:
+    enabled: true
+    top_k: 10
+
+recon:
+  crawler:
+    max_depth: 3
+    max_pages: 100
+  js_processor:
+    enabled: true
+    analyze_inline: true
+
+exploitation:
+  orchestrator:
+    max_concurrent: 5
+    retry_attempts: 3
+  chains:
+    enabled: true
+    max_chain_length: 5
+
+pipelines:
+  xss:
+    enabled: true
+    auto_exploit: true
+  sqli:
+    enabled: true
+    extract_data: true
+  idor:
+    enabled: true
+    detect_sensitive: true

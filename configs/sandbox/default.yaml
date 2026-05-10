@@ -1,0 +1,25 @@
+# Sandbox Configuration
+# =====================
+
+docker:
+  enabled: true
+  image: "python:3.11-slim"
+  timeout: 30
+  memory_limit: "512m"
+  cpu_limit: 0.5
+
+isolation:
+  network: true
+  filesystem: true
+  process: true
+
+target_emulator:
+  enabled: true
+  default_targets: ["dvwa", "webgoat", "juiceshop"]
+  auto_start: false
+
+lab_environment:
+  enabled: true
+  max_concurrent_labs: 3
+  auto_cleanup: true
+  cleanup_timeout: 300

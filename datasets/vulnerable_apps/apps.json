@@ -1,0 +1,30 @@
+{
+  "version": "1.0.0",
+  "description": "Vulnerable applications for testing",
+  "applications": [
+    {
+      "name": "DVWA",
+      "url": "http://localhost:8080/dvwa",
+      "vulnerabilities": ["SQLi", "XSS", "CSRF", "File Inclusion", "Upload", "RCE"],
+      "credentials": {"username": "admin", "password": "password"}
+    },
+    {
+      "name": "WebGoat",
+      "url": "http://localhost:8080/WebGoat",
+      "vulnerabilities": ["SQLi", "XSS", "IDOR", "Path Traversal", "JWT"],
+      "credentials": {"username": "guest", "password": "guest"}
+    },
+    {
+      "name": "Juice Shop",
+      "url": "http://localhost:3000",
+      "vulnerabilities": ["SQLi", "XSS", "IDOR", "Broken Auth"],
+      "credentials": {"username": "admin@juice-sh.op", "password": "admin123"}
+    },
+    {
+      "name": "bWAPP",
+      "url": "http://localhost:8080/bWAPP",
+      "vulnerabilities": ["SQLi", "XSS", "LFI", "RCE", "XXE"],
+      "credentials": {"username": "bee", "password": "bug"}
+    }
+  ]
+}

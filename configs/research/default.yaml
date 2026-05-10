@@ -1,0 +1,21 @@
+# Research Configuration
+# ======================
+
+experimentation:
+  enabled: true
+  output_dir: "./research/results"
+  save_raw_data: true
+
+benchmarking:
+  enabled: true
+  iterations: 10
+  warmup_iterations: 2
+
+pattern_discovery:
+  enabled: true
+  min_support: 0.01
+  max_patterns: 1000
+
+visualization:
+  enabled: true
+  output_format: "html"

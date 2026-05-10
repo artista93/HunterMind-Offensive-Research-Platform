@@ -1,0 +1,72 @@
+version: '3.8'
+
+services:
+  # API Service
+  api:
+    build: .
+    container_name: huntermind-api
+    ports:
+      - "8000:8000"
+      - "8001:8001"
+    environment:
+      - PYTHONUNBUFFERED=1
+      - CONFIG_PATH=/app/config.yaml
+    volumes:
+      - ./storage:/app/storage
+      - ./logs:/app/logs
+    command: python interfaces/api/fastapi_server.py
+    restart: unless-stopped
+    networks:
+      - huntermind-net
+
+  # Dashboard Service
+  dashboard:
+    build: .
+    container_name: huntermind-dashboard
+    ports:
+      - "5000:5000"
+      - "5001:5001"
+      - "5002:5002"
+      - "5003:5003"
+    environment:
+      - PYTHONUNBUFFERED=1
+    volumes:
+      - ./storage:/app/storage
+      - ./logs:/app/logs
+    command: python interfaces/dashboard/dashboard_server.py
+    restart: unless-stopped
+    networks:
+      - huntermind-net
+
+  # Redis for caching (optional)
+  redis:
+    image: redis:7-alpine
+    container_name: huntermind-redis
+    ports:
+      - "6379:6379"
+    restart: unless-stopped
+    networks:
+      - huntermind-net
+
+  # PostgreSQL for production (optional)
+  postgres:
+    image: postgres:15-alpine
+    container_name: huntermind-postgres
+    environment:
+      - POSTGRES_USER=huntermind
+      - POSTGRES_PASSWORD=huntermind123
+      - POSTGRES_DB=huntermind
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    restart: unless-stopped
+    networks:
+      - huntermind-net
+
+networks:
+  huntermind-net:
+    driver: bridge
+
+volumes:
+  postgres_data:

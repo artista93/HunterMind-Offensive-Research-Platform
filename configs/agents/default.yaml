@@ -1,0 +1,79 @@
+# Default Agent Configuration
+# ===========================
+
+common:
+  heartbeat_interval: 10
+  health_check_interval: 30
+  max_retries: 3
+  timeout: 30
+
+crawler_agent:
+  enabled: true
+  max_depth: 3
+  max_pages: 100
+  max_concurrent: 5
+  rate_limit: 1.0
+  respect_robots: true
+  use_browser: true
+
+recon_agent:
+  enabled: true
+  max_depth: 3
+  max_pages: 100
+  fingerprint_enabled: true
+  tech_detection_enabled: true
+
+xss_agent:
+  enabled: true
+  rate_limit: 2.0
+  timeout: 30
+  verify_execution: true
+  max_payloads: 100
+
+sqli_agent:
+  enabled: true
+  rate_limit: 1.0
+  timeout: 30
+  boolean_threshold: 0.2
+  time_threshold: 4.0
+
+idor_agent:
+  enabled: true
+  rate_limit: 2.0
+  timeout: 30
+  test_increment: true
+  test_decrement: true
+
+waf_agent:
+  enabled: true
+  rate_limit: 1.0
+  timeout: 30
+  bypass_techniques: ["case_swapping", "url_encoding", "double_encoding"]
+
+auth_agent:
+  enabled: true
+  rate_limit: 1.0
+  timeout: 30
+  test_weak_passwords: true
+  analyze_jwt: true
+
+exploitation_agent:
+  enabled: true
+  max_concurrent: 5
+  retry_attempts: 3
+  step_timeout: 60
+
+learning_agent:
+  enabled: true
+  learning_rate: 0.01
+  discount_factor: 0.95
+  exploration_rate: 0.1
+
+reasoning_agent:
+  enabled: true
+  max_reasoning_depth: 5
+
+planning_agent:
+  enabled: true
+  max_plan_steps: 10
+  parallel_execution: true

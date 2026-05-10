@@ -1,0 +1,36 @@
+# Learning Configuration
+# ======================
+
+meta_learning:
+  enabled: true
+  strategies: ["aggressive", "conservative", "adaptive"]
+  evaluation_window: 100
+
+reinforcement:
+  dqn:
+    enabled: true
+    learning_rate: 0.001
+    gamma: 0.95
+    epsilon: 1.0
+    epsilon_min: 0.01
+    epsilon_decay: 0.995
+  ppo:
+    enabled: true
+    learning_rate: 0.0003
+    gamma: 0.99
+    clip_epsilon: 0.2
+  actor_critic:
+    enabled: true
+    actor_lr: 0.001
+    critic_lr: 0.001
+
+sequence_learning:
+  enabled: true
+  max_sequence_length: 50
+  min_pattern_frequency: 2
+
+online_learning:
+  enabled: true
+  update_interval: 60
+  batch_size: 32
+  memory_size: 10000
