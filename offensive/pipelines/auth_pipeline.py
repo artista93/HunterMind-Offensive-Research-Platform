@@ -1,4 +1,3 @@
-
 import asyncio
 import base64
 from typing import Dict, List, Optional, Any, Set
@@ -18,7 +17,6 @@ logger = logging.getLogger(__name__)
 
 @dataclass
 class AuthPipelineResult:
-    """نتائج خط أنابيب المصادقة"""
     target_url: str
     start_time: datetime
     end_time: Optional[datetime] = None
@@ -38,33 +36,54 @@ class AuthPipelineResult:
 class AuthPipeline:
     """
     خط أنابيب اختبار المصادقة المتكامل
-    
-    الميزات:
-    - اختبار قوة كلمات المرور
-    - اكتشاف ثغرات JWT (alg none, weak secret, expired)
-    - اختبار Session Fixation
-    - كشف نقاط نهاية المصادقة غير المحمية
-    - اختبار المصادقة متعددة العوامل (MFA)
-    - تخمين كلمات المرور الضعيفة
-    - تكامل مع ذاكرة الاستغلال
     """
     
-    # كلمات مرور ضعيفة شائعة للاختبار
     COMMON_PASSWORDS = [
         "password", "123456", "12345678", "1234", "qwerty", "abc123",
         "admin", "letmein", "welcome", "monkey", "dragon", "master",
         "login", "pass", "password123", "admin123", "user123", "test123"
     ]
     
-    def __init__(self):
+    def __init__(self, http_client=None):
         self._scanner = AuthScanner()
         self._generator = get_payload_generator()
         self._orchestrator = get_exploit_orchestrator()
-        self._memory = get_exploit_memory()
+        self._memory = get_exploit_memory()  # ✅ تمت الإعادة
+        self._http_client = http_client
         
         self._active_pipelines: Dict[str, AuthPipelineResult] = {}
         
         logger.info("AuthPipeline initialized")
+    
+    def set_http_client(self, client):
+        self._http_client = client
+        if hasattr(self._scanner, 'set_http_client'):
+            self._scanner.set_http_client(client)
+    
+    async def _send_request(
+        self,
+        url: str,
+        method: str = "POST",
+        data: Dict = None,
+        headers: Dict = None
+    ) -> tuple:
+        if self._http_client and hasattr(self._http_client, 'send_request'):
+            response = await self._http_client.send_request(
+                url, method=method, data=data, headers=headers
+            )
+            return response, 200 if response else 404
+        
+        try:
+            import httpx
+            async with httpx.AsyncClient(timeout=30.0, follow_redirects=False) as client:
+                if method.upper() == "POST":
+                    response = await client.post(url, data=data, headers=headers)
+                else:
+                    response = await client.get(url, headers=headers)
+                return response.text, response.status_code
+        except Exception as e:
+            logger.debug(f"Request error: {e}")
+            return None, 0
     
     async def run(
         self,
@@ -78,23 +97,6 @@ class AuthPipeline:
         test_session: bool = True,
         max_attempts: int = 20
     ) -> AuthPipelineResult:
-        """
-        تنفيذ خط أنابيب اختبار المصادقة كامل
-        
-        Args:
-            target_url: الرابط المستهدف
-            login_url: رابط صفحة تسجيل الدخول (إذا اختلف عن target_url)
-            username_field: اسم حقل اسم المستخدم
-            password_field: اسم حقل كلمة المرور
-            headers: هيدرات مخصصة
-            test_weak_passwords: اختبار كلمات مرور ضعيفة
-            test_jwt: اختبار ثغرات JWT
-            test_session: اختبار ثغرات الجلسات
-            max_attempts: الحد الأقصى لمحاولات التخمين
-        
-        Returns:
-            نتائج خط الأنابيب
-        """
         pipeline_id = f"auth_{target_url}_{int(datetime.now().timestamp())}"
         
         result = AuthPipelineResult(
@@ -107,7 +109,6 @@ class AuthPipeline:
         logger.info(f"Starting Auth pipeline for {target_url}")
         
         try:
-            # 1. تحضير السياق
             context = ScanContext(
                 target=ScanTarget(
                     url=target_url,
@@ -115,7 +116,7 @@ class AuthPipeline:
                 )
             )
             
-            # 2. البحث عن استغلالات سابقة مشابهة
+            # ✅ استخدام ExploitMemory
             similar_exploits = self._memory.find_similar_exploits(
                 vulnerability_type="Authentication",
                 min_success_rate=0.5,
@@ -125,18 +126,17 @@ class AuthPipeline:
             if similar_exploits:
                 logger.info(f"Found {len(similar_exploits)} similar exploits in memory")
             
-            # 3. تنفيذ الفحص
             findings = await self._scanner.scan(context)
             result.findings = findings
             result.total_findings = len(findings)
             
-            # 4. اختبار كلمات المرور الضعيفة
             if test_weak_passwords and login_url:
                 weak_results = await self._test_weak_passwords(
                     login_url or target_url,
                     username_field,
                     password_field,
-                    max_attempts
+                    max_attempts,
+                    headers
                 )
                 result.weak_credentials = weak_results
                 result.weak_credentials_found = len(weak_results)
@@ -144,18 +144,16 @@ class AuthPipeline:
                 for cred in weak_results:
                     result.compromised_accounts.append(cred.get("username", ""))
             
-            # 5. اختبار JWT
             if test_jwt:
                 jwt_results = await self._test_jwt_vulnerabilities(context)
                 result.jwt_issues = jwt_results
                 result.jwt_issues_found = len(jwt_results)
             
-            # 6. اختبار الجلسات
             if test_session:
                 session_results = await self._test_session_vulnerabilities(context)
                 result.session_issues = session_results
             
-            # 7. تخزين الاستغلالات الناجحة في الذاكرة
+            # ✅ تخزين الاستغلالات الناجحة في ExploitMemory
             for finding in findings:
                 if finding.confidence in [Confidence.HIGH, Confidence.CERTAIN]:
                     self._memory.store_exploit(
@@ -182,7 +180,6 @@ class AuthPipeline:
         
         finally:
             result.end_time = datetime.now()
-            await self._scanner.close()
         
         logger.info(f"Auth pipeline completed: {result.total_findings} findings, {result.weak_credentials_found} weak credentials")
         
@@ -193,22 +190,9 @@ class AuthPipeline:
         login_url: str,
         username_field: str,
         password_field: str,
-        max_attempts: int
+        max_attempts: int,
+        headers: Dict = None
     ) -> List[Dict]:
-        """
-        اختبار كلمات مرور ضعيفة على صفحة تسجيل الدخول
-        
-        Args:
-            login_url: رابط تسجيل الدخول
-            username_field: اسم حقل اسم المستخدم
-            password_field: اسم حقل كلمة المرور
-            max_attempts: الحد الأقصى للمحاولات
-        
-        Returns:
-            قائمة بالحسابات المخترقة
-        """
-        import httpx
-        
         compromised = []
         common_usernames = ["admin", "user", "test", "root", "administrator"]
         
@@ -219,27 +203,34 @@ class AuthPipeline:
                     break
                 
                 try:
-                    async with httpx.AsyncClient() as client:
-                        response = await client.post(
-                            login_url,
-                            data={
-                                username_field: username,
-                                password_field: password
-                            },
-                            follow_redirects=False
-                        )
-                        
-                        # التحقق من نجاح تسجيل الدخول
-                        if response.status_code in [302, 303] or "dashboard" in response.text.lower():
-                            compromised.append({
-                                "username": username,
-                                "password": password,
-                                "url": login_url,
-                                "status_code": response.status_code
-                            })
-                            
-                            logger.warning(f"Found weak credentials: {username}:{password}")
-                            
+                    response_text, status_code = await self._send_request(
+                        login_url,
+                        method="POST",
+                        data={
+                            username_field: username,
+                            password_field: password
+                        },
+                        headers=headers
+                    )
+                    
+                    if status_code in [302, 303]:
+                        compromised.append({
+                            "username": username,
+                            "password": password,
+                            "url": login_url,
+                            "status_code": status_code
+                        })
+                        logger.warning(f"Found weak credentials: {username}:{password}")
+                    
+                    elif response_text and ("dashboard" in response_text.lower() or "welcome" in response_text.lower()):
+                        compromised.append({
+                            "username": username,
+                            "password": password,
+                            "url": login_url,
+                            "status_code": status_code
+                        })
+                        logger.warning(f"Found weak credentials: {username}:{password}")
+                    
                 except Exception as e:
                     logger.debug(f"Login attempt failed: {e}")
                 
@@ -248,21 +239,13 @@ class AuthPipeline:
         return compromised
     
     async def _test_jwt_vulnerabilities(self, context: ScanContext) -> List[Dict]:
-        """
-        اختبار ثغرات JWT
-        
-        Returns:
-            قائمة بمشاكل JWT المكتشفة
-        """
         issues = []
         
-        # البحث عن توكنات JWT في الـ Headers
         auth_header = context.target.headers.get("Authorization", "")
         
         if "Bearer " in auth_header:
             token = auth_header.replace("Bearer ", "")
             
-            # اختبار خوارزمية none
             if await self._test_jwt_none_algorithm(token):
                 issues.append({
                     "type": "JWT None Algorithm",
@@ -271,7 +254,6 @@ class AuthPipeline:
                     "remediation": "Disable 'none' algorithm. Use strong algorithms like RS256 or HS256."
                 })
             
-            # اختبار انتهاء الصلاحية
             expired = await self._test_jwt_expiration(token)
             if expired:
                 issues.append({
@@ -284,48 +266,31 @@ class AuthPipeline:
         return issues
     
     async def _test_jwt_none_algorithm(self, token: str) -> bool:
-        """اختبار خوارزمية none في JWT"""
         try:
             import jwt
-            
-            # محاولة فك التشفير مع alg=none
             decoded = jwt.decode(token, options={"verify_signature": False})
-            
-            # التحقق من نجاح الفك
             return decoded is not None
-            
         except Exception:
             return False
     
     async def _test_jwt_expiration(self, token: str) -> bool:
-        """اختبار قبول التوكنات منتهية الصلاحية"""
         try:
             import jwt
+            import time
             
-            # فك التشفير دون التحقق من التوقيع
             decoded = jwt.decode(token, options={"verify_signature": False})
             
-            # التحقق من وجود exp
             if "exp" in decoded:
-                import time
                 if decoded["exp"] < time.time():
                     return True
-                    
         except Exception:
             pass
         
         return False
     
     async def _test_session_vulnerabilities(self, context: ScanContext) -> List[Dict]:
-        """
-        اختبار ثغرات الجلسات
-        
-        Returns:
-            قائمة بمشاكل الجلسات المكتشفة
-        """
         issues = []
         
-        # التحقق من وجود Session ID في URL
         if "PHPSESSID=" in context.target.url or "JSESSIONID=" in context.target.url:
             issues.append({
                 "type": "Session ID in URL",
@@ -334,7 +299,6 @@ class AuthPipeline:
                 "remediation": "Store session IDs in cookies only. Use HttpOnly and Secure flags."
             })
         
-        # التحقق من استخدام HTTP (غير آمن)
         if context.target.url.startswith("http://"):
             issues.append({
                 "type": "Insecure Session Transmission",
@@ -346,15 +310,6 @@ class AuthPipeline:
         return issues
     
     async def generate_auth_report(self, result: AuthPipelineResult) -> str:
-        """
-        توليد تقرير أمن المصادقة
-        
-        Args:
-            result: نتائج خط الأنابيب
-        
-        Returns:
-            تقرير Markdown
-        """
         report = f"""# Authentication Security Report
 
 **Target:** {result.target_url}
@@ -386,22 +341,27 @@ class AuthPipeline:
         if not result.jwt_issues:
             report += "- No JWT issues found\n"
         
+        report += "\n## Session Issues\n"
+        for issue in result.session_issues:
+            report += f"- **[{issue['severity']}]** {issue['type']}: {issue['description']}\n"
+        
+        if not result.session_issues:
+            report += "- No session issues found\n"
+        
         report += "\n## Recommendations\n"
-        report += "1. Enforce strong password policy (minimum 8 characters, mixed case, numbers, symbols)\n"
+        report += "1. Enforce strong password policy\n"
         report += "2. Implement account lockout after failed attempts\n"
         report += "3. Use multi-factor authentication (MFA)\n"
         report += "4. Implement proper session management with HttpOnly and Secure flags\n"
         report += "5. Use HTTPS exclusively for authenticated traffic\n"
-        report += "6. Implement JWT validation with strong algorithms (RS256 or HS256 with strong secrets)\n"
+        report += "6. Implement JWT validation with strong algorithms\n"
         
         return report
     
     async def get_result(self, pipeline_id: str) -> Optional[AuthPipelineResult]:
-        """الحصول على نتيجة خط الأنابيب"""
         return self._active_pipelines.get(pipeline_id)
     
     async def get_summary(self) -> Dict:
-        """ملخص خطوط الأنابيب النشطة"""
         return {
             "active_pipelines": len(self._active_pipelines),
             "completed": sum(1 for r in self._active_pipelines.values() if r.status == "completed"),
@@ -413,13 +373,8 @@ class AuthPipeline:
         }
     
     async def close(self):
-        """إغلاق الخط الأنابيب"""
-        await self._scanner.close()
         logger.info("AuthPipeline closed")
 
 
-# نسخة عالمية
 async def get_auth_pipeline() -> AuthPipeline:
-    """الحصول على نسخة من خط أنابيب المصادقة"""
     return AuthPipeline()
-

@@ -1,69 +1,73 @@
+"""
+Event Bus - ناقل الأحداث
+يدير توزيع الأحداث بين المكونات المختلفة في النظام
+"""
 
 import asyncio
-from typing import Dict, List, Optional, Any, Set, Callable
+import uuid
+from typing import Dict, List, Optional, Any, Callable
 from dataclasses import dataclass, field
 from datetime import datetime
 from collections import defaultdict
+from enum import Enum
 
 import logging
 
 logger = logging.getLogger(__name__)
 
 
+class EventType(Enum):
+    """أنواع الأحداث"""
+    SYSTEM_START = "system_start"
+    SYSTEM_STOP = "system_stop"
+    COMPONENT_LOAD = "component_load"
+    COMPONENT_UNLOAD = "component_unload"
+    TASK_START = "task_start"
+    TASK_COMPLETE = "task_complete"
+    TASK_FAIL = "task_fail"
+    DATA_RECEIVED = "data_received"
+    DATA_SENT = "data_sent"
+    CONNECTION_ESTABLISHED = "connection_established"
+    CONNECTION_CLOSED = "connection_closed"
+    CUSTOM = "custom"
+
+
 @dataclass
 class Event:
     """حدث"""
-    type: str
+    type: EventType
     source: str
     data: Any
-    timestamp: datetime = field(default_factory=datetime.now)
     id: str = ""
+    timestamp: datetime = field(default_factory=datetime.now)
 
 
 class EventBus:
     """
     ناقل الأحداث المتقدم
-    
-    الميزات:
-    - نشر والاشتراك في الأحداث (Pub/Sub)
-    - معالجة غير متزامنة
-    - تصفية الأحداث
-    - تتبع تاريخ الأحداث
     """
     
     def __init__(self, max_history: int = 1000):
-        self.subscribers: Dict[str, List[Callable]] = defaultdict(list)
+        self.subscribers: Dict[EventType, List[Callable]] = defaultdict(list)
         self.event_history: List[Event] = []
         self.max_history = max_history
         self._lock = asyncio.Lock()
         
         logger.info("EventBus initialized")
     
-    async def subscribe(self, event_type: str, handler: Callable):
-        """
-        الاشتراك في نوع حدث معين
-        
-        Args:
-            event_type: نوع الحدث
-            handler: دالة معالجة الحدث
-        """
+    async def subscribe(self, event_type: EventType, handler: Callable):
+        """الاشتراك في نوع حدث معين"""
         async with self._lock:
             if handler not in self.subscribers[event_type]:
                 self.subscribers[event_type].append(handler)
-                logger.debug(f"Subscribed to {event_type}")
+                logger.debug(f"Subscribed to {event_type.value}")
     
-    async def unsubscribe(self, event_type: str, handler: Callable):
-        """
-        إلغاء الاشتراك في نوع حدث معين
-        
-        Args:
-            event_type: نوع الحدث
-            handler: دالة معالجة الحدث
-        """
+    async def unsubscribe(self, event_type: EventType, handler: Callable):
+        """إلغاء الاشتراك في نوع حدث معين"""
         async with self._lock:
             if handler in self.subscribers[event_type]:
                 self.subscribers[event_type].remove(handler)
-                logger.debug(f"Unsubscribed from {event_type}")
+                logger.debug(f"Unsubscribed from {event_type.value}")
     
     async def publish(self, event: Event):
         """
@@ -72,7 +76,6 @@ class EventBus:
         Args:
             event: الحدث المنشور
         """
-        import uuid
         event.id = str(uuid.uuid4())[:8]
         
         # تخزين الحدث في التاريخ
@@ -83,7 +86,7 @@ class EventBus:
         
         # توزيع الحدث على المشتركين
         handlers = self.subscribers.get(event.type, [])
-        handlers.extend(self.subscribers.get("*", []))  # المشتركين في جميع الأحداث
+        handlers.extend(self.subscribers.get(EventType.CUSTOM, []))
         
         if not handlers:
             return
@@ -99,19 +102,10 @@ class EventBus:
         if tasks:
             await asyncio.gather(*tasks, return_exceptions=True)
         
-        logger.debug(f"Event published: {event.type} from {event.source}")
+        logger.debug(f"Event published: {event.type.value} from {event.source}")
     
-    async def get_history(self, event_type: str = None, limit: int = 100) -> List[Event]:
-        """
-        الحصول على تاريخ الأحداث
-        
-        Args:
-            event_type: نوع الحدث (اختياري)
-            limit: عدد النتائج
-        
-        Returns:
-            قائمة بالأحداث
-        """
+    async def get_history(self, event_type: EventType = None, limit: int = 100) -> List[Event]:
+        """الحصول على تاريخ الأحداث"""
         async with self._lock:
             events = self.event_history
             if event_type:
@@ -129,7 +123,7 @@ class EventBus:
         async with self._lock:
             event_types = defaultdict(int)
             for event in self.event_history:
-                event_types[event.type] += 1
+                event_types[event.type.value] += 1
             
             return {
                 "total_events": len(self.event_history),
@@ -138,4 +132,3 @@ class EventBus:
                 "total_subscribers": sum(len(h) for h in self.subscribers.values()),
                 "max_history": self.max_history
             }
-

@@ -687,3 +687,78 @@ async def get_persistence_manager() -> PersistenceManager:
         _default_manager = PersistenceManager()
     return _default_manager
 
+
+    async def save_scan_result(self, scan_data: dict) -> str:
+        """
+        حفظ نتيجة فحص في قاعدة البيانات
+        
+        Args:
+            scan_data: بيانات الفحص (target, timestamp, findings_count, findings)
+        
+        Returns:
+            معرف الفحص
+        """
+        import uuid
+        import json
+        
+        scan_id = str(uuid.uuid4())[:8]
+        
+        # إنشاء جدول scans إذا لم يكن موجوداً
+        async with self._write_lock:
+            conn = sqlite3.connect(self._db_path)
+            cursor = conn.cursor()
+            
+            # إنشاء جدول scans
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS scans (
+                    id TEXT PRIMARY KEY,
+                    target_url TEXT NOT NULL,
+                    timestamp TEXT NOT NULL,
+                    findings_count INTEGER DEFAULT 0,
+                    data TEXT,
+                    created_at TEXT DEFAULT CURRENT_TIMESTAMP
+                )
+            ''')
+            
+            # إدراج البيانات
+            query = '''
+                INSERT INTO scans (id, target_url, timestamp, findings_count, data)
+                VALUES (?, ?, ?, ?, ?)
+            '''
+            
+            params = (
+                scan_id,
+                scan_data.get("target", ""),
+                scan_data.get("timestamp", datetime.now().isoformat()),
+                scan_data.get("findings_count", 0),
+                json.dumps(scan_data, default=str)
+            )
+            
+            cursor.execute(query, params)
+            conn.commit()
+            conn.close()
+        
+        logger.info(f"Scan result saved: {scan_id} for {scan_data.get('target', 'unknown')}")
+        return scan_id
+    
+    async def get_scans(self, limit: int = 50) -> List[Dict]:
+        """
+        الحصول على قائمة الفحوصات المحفوظة
+        
+        Args:
+            limit: عدد النتائج
+        
+        Returns:
+            قائمة بالفحوصات
+        """
+        query = "SELECT id, target_url, timestamp, findings_count FROM scans ORDER BY created_at DESC LIMIT ?"
+        
+        async with self._write_lock:
+            conn = sqlite3.connect(self._db_path)
+            conn.row_factory = sqlite3.Row
+            cursor = conn.cursor()
+            cursor.execute(query, (limit,))
+            rows = cursor.fetchall()
+            conn.close()
+        
+        return [dict(row) for row in rows]

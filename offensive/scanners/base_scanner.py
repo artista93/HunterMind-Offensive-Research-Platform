@@ -1,6 +1,6 @@
-
 import asyncio
 import time
+import httpx
 from abc import ABC, abstractmethod
 from typing import Dict, List, Optional, Any, Callable, Awaitable
 from dataclasses import dataclass, field
@@ -22,11 +22,11 @@ class Severity(Enum):
 
 class Confidence(Enum):
     """مستوى الثقة في اكتشاف الثغرة"""
-    CERTAIN = "certain"      # 100% - مؤكد
-    HIGH = "high"            # 80-99%
-    MEDIUM = "medium"        # 50-79%
-    LOW = "low"              # 20-49%
-    TENTATIVE = "tentative"  # <20%
+    CERTAIN = "certain"
+    HIGH = "high"
+    MEDIUM = "medium"
+    LOW = "low"
+    TENTATIVE = "tentative"
 
 
 @dataclass
@@ -80,12 +80,13 @@ class BaseScanner(ABC):
     - مهلات زمنية
     - إعادة المحاولة التلقائية
     - تسجيل النتائج
+    - إرسال الطلبات HTTP الحقيقية
     """
     
     def __init__(
         self,
         name: str,
-        rate_limit: float = 1.0,  # طلب في الثانية
+        rate_limit: float = 1.0,
         timeout: int = 30,
         max_retries: int = 3,
         enabled: bool = True
@@ -96,7 +97,6 @@ class BaseScanner(ABC):
         self.max_retries = max_retries
         self.enabled = enabled
         
-        # إحصائيات
         self._total_requests = 0
         self._total_findings = 0
         self._last_request_time = 0
@@ -106,37 +106,13 @@ class BaseScanner(ABC):
     
     @abstractmethod
     async def scan(self, context: ScanContext) -> List[Finding]:
-        """
-        تنفيذ فحص الثغرات
-        
-        Args:
-            context: سياق الفحص
-        
-        Returns:
-            قائمة النتائج
-        """
         pass
     
     @abstractmethod
     async def can_scan(self, context: ScanContext) -> bool:
-        """
-        التحقق مما إذا كان الفاحص يمكنه فحص الهدف
-        
-        Returns:
-            True إذا كان الفحص ممكناً
-        """
         pass
     
     async def execute_scan(self, context: ScanContext) -> List[Finding]:
-        """
-        تنفيذ الفحص مع إدارة الأخطاء والتكرار
-        
-        Args:
-            context: سياق الفحص
-        
-        Returns:
-            قائمة النتائج
-        """
         if not self.enabled:
             logger.debug(f"Scanner {self.name} is disabled")
             return []
@@ -150,15 +126,11 @@ class BaseScanner(ABC):
         
         while retries <= self.max_retries:
             try:
-                # تطبيق تقييد المعدل
                 await self._apply_rate_limit()
-                
-                # تنفيذ الفحص
                 findings = await asyncio.wait_for(
                     self.scan(context),
                     timeout=self.timeout
                 )
-                
                 self._total_findings += len(findings)
                 break
                 
@@ -177,7 +149,6 @@ class BaseScanner(ABC):
         return findings
     
     async def _apply_rate_limit(self):
-        """تطبيق تقييد المعدل"""
         if self.rate_limit <= 0:
             return
         
@@ -190,6 +161,59 @@ class BaseScanner(ABC):
         
         self._last_request_time = time.time()
         self._total_requests += 1
+    
+    async def send_request(
+        self,
+        url: str,
+        method: str = "GET",
+        params: Dict = None,
+        data: Dict = None,
+        headers: Dict = None
+    ) -> Optional[str]:
+        """
+        إرسال طلب HTTP حقيقي
+        
+        Args:
+            url: الرابط المستهدف
+            method: طريقة الطلب (GET, POST, PUT, DELETE)
+            params: معاملات URL
+            data: بيانات POST
+            headers: هيدرات إضافية
+        
+        Returns:
+            نص الاستجابة أو None
+        """
+        try:
+            async with httpx.AsyncClient(
+                timeout=self.timeout,
+                follow_redirects=True,
+                verify=False
+            ) as client:
+                
+                if method.upper() == "GET":
+                    response = await client.get(url, params=params, headers=headers)
+                elif method.upper() == "POST":
+                    response = await client.post(url, params=params, data=data, headers=headers)
+                elif method.upper() == "PUT":
+                    response = await client.put(url, params=params, data=data, headers=headers)
+                elif method.upper() == "DELETE":
+                    response = await client.delete(url, params=params, headers=headers)
+                else:
+                    response = await client.request(method, url, params=params, data=data, headers=headers)
+                
+                self._total_requests += 1
+                logger.debug(f"Request: {method} {url} -> {response.status_code}")
+                return response.text
+                
+        except httpx.TimeoutException:
+            logger.warning(f"Request timeout: {url}")
+            return None
+        except httpx.ConnectError:
+            logger.warning(f"Connection error: {url}")
+            return None
+        except Exception as e:
+            logger.debug(f"Request failed: {e}")
+            return None
     
     def add_finding(
         self,
@@ -237,4 +261,3 @@ class BaseScanner(ABC):
         if self._session:
             await self._session.close()
         logger.info(f"Scanner closed: {self.name}")
-

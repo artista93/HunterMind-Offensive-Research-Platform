@@ -1,26 +1,28 @@
-
 import asyncio
 import random
 import time
+import uuid
 from typing import Dict, List, Optional, Any, Callable
 from dataclasses import dataclass, field
 from enum import Enum
 from collections import defaultdict
 
+import logging
+
+logger = logging.getLogger(__name__)
+
 
 class RoutingStrategy(Enum):
-    """استراتيجية التوجيه"""
-    ROUND_ROBIN = "round_robin"      # توزيع دوري
-    RANDOM = "random"                 # عشوائي
-    WEIGHTED = "weighted"            # حسب الوزن
-    LEAST_LOADED = "least_loaded"    # أقل تحميل
-    FASTEST = "fastest"              # الأسرع
-    STICKY = "sticky"                # ثابت (لجلسة معينة)
+    ROUND_ROBIN = "round_robin"
+    RANDOM = "random"
+    WEIGHTED = "weighted"
+    LEAST_LOADED = "least_loaded"
+    FASTEST = "fastest"
+    STICKY = "sticky"
 
 
 @dataclass
 class RouteTarget:
-    """هدف التوجيه (Proxy أو عنوان مباشر)"""
     id: str
     url: str
     weight: int = 1
@@ -37,7 +39,6 @@ class RouteTarget:
     
     @property
     def full_url(self) -> str:
-        """URL الكامل مع المصادقة"""
         if self.username and self.password:
             if "://" in self.url:
                 protocol, rest = self.url.split("://", 1)
@@ -47,7 +48,6 @@ class RouteTarget:
     
     @property
     def success_rate(self) -> float:
-        """نسبة النجاح"""
         total = self.success_count + self.fail_count
         if total == 0:
             return 1.0
@@ -55,27 +55,23 @@ class RouteTarget:
     
     @property
     def load(self) -> float:
-        """التحميل الحالي (كلما زاد، زاد الاستخدام)"""
         if self.avg_response_time == 0:
             return 0
         return self.usage_count / max(1, self.avg_response_time)
     
     def record_success(self, response_time: float):
-        """تسجيل نجاح"""
         self.success_count += 1
         self.usage_count += 1
         self.avg_response_time = (self.avg_response_time * 0.7 + response_time * 0.3)
         self.is_healthy = True
     
     def record_failure(self):
-        """تسجيل فشل"""
         self.fail_count += 1
         self.usage_count += 1
         if self.fail_count > 3:
             self.is_healthy = False
     
     def reset_health(self):
-        """إعادة تعيين حالة الصحة"""
         self.is_healthy = True
         self.fail_count = 0
 
@@ -83,15 +79,15 @@ class RouteTarget:
 class RequestRouter:
     """موجه الطلبات الذكي"""
     
-    def __init__(self, strategy: RoutingStrategy = RoutingStrategy.ROUND_ROBIN):
+    def __init__(self, strategy: RoutingStrategy = RoutingStrategy.ROUND_ROBIN, http_client=None):
         self.strategy = strategy
+        self._http_client = http_client
         self._targets: List[RouteTarget] = []
         self._targets_by_id: Dict[str, RouteTarget] = {}
         self._current_index = 0
-        self._sticky_map: Dict[str, str] = {}  # session_id -> target_id
+        self._sticky_map: Dict[str, str] = {}
         self._lock = asyncio.Lock()
         
-        # إحصائيات
         self._stats = {
             "total_routes": 0,
             "successful_routes": 0,
@@ -99,9 +95,28 @@ class RequestRouter:
             "strategy_changes": 0
         }
     
+    def set_http_client(self, client):
+        """تعيين عميل HTTP"""
+        self._http_client = client
+    
+    async def _send_request_via_target(self, target: RouteTarget, test_url: str) -> tuple:
+        """إرسال طلب اختبار عبر هدف"""
+        if self._http_client and hasattr(self._http_client, 'send_request'):
+            start = time.time()
+            try:
+                if target.is_proxy:
+                    response = await self._http_client.send_request(
+                        test_url, method="GET", proxy=target.full_url
+                    )
+                else:
+                    response = await self._http_client.send_request(test_url, method="GET")
+                elapsed = (time.time() - start) * 1000  # ms
+                return response is not None, elapsed
+            except Exception:
+                return False, 0
+        return False, 0
+    
     def add_target(self, url: str, weight: int = 1, username: str = None, password: str = None, is_proxy: bool = True) -> str:
-        """إضافة هدف توجيه جديد"""
-        import uuid
         target_id = str(uuid.uuid4())[:8]
         
         target = RouteTarget(
@@ -118,7 +133,6 @@ class RequestRouter:
         return target_id
     
     def add_targets(self, targets: List[Dict]):
-        """إضافة عدة أهداف"""
         for t in targets:
             self.add_target(
                 url=t["url"],
@@ -129,24 +143,20 @@ class RequestRouter:
             )
     
     def remove_target(self, target_id: str) -> bool:
-        """إزالة هدف"""
         if target_id not in self._targets_by_id:
             return False
         
         self._targets = [t for t in self._targets if t.id != target_id]
         del self._targets_by_id[target_id]
         
-        # تنظيف sticky map
         self._sticky_map = {k: v for k, v in self._sticky_map.items() if v != target_id}
         
         return True
     
     def get_healthy_targets(self) -> List[RouteTarget]:
-        """الحصول على الأهداف السليمة فقط"""
         return [t for t in self._targets if t.is_healthy]
     
     def _select_round_robin(self, targets: List[RouteTarget]) -> Optional[RouteTarget]:
-        """اختيار هدف بطريقة Round Robin"""
         if not targets:
             return None
         target = targets[self._current_index % len(targets)]
@@ -154,13 +164,11 @@ class RequestRouter:
         return target
     
     def _select_random(self, targets: List[RouteTarget]) -> Optional[RouteTarget]:
-        """اختيار هدف عشوائي"""
         if not targets:
             return None
         return random.choice(targets)
     
     def _select_weighted(self, targets: List[RouteTarget]) -> Optional[RouteTarget]:
-        """اختيار هدف حسب الوزن"""
         if not targets:
             return None
         
@@ -177,17 +185,14 @@ class RequestRouter:
         return targets[0]
     
     def _select_least_loaded(self, targets: List[RouteTarget]) -> Optional[RouteTarget]:
-        """اختيار هدف أقل تحميلاً"""
         if not targets:
             return None
         return min(targets, key=lambda t: t.load)
     
     def _select_fastest(self, targets: List[RouteTarget]) -> Optional[RouteTarget]:
-        """اختيار أسرع هدف"""
         if not targets:
             return None
         
-        # تجاهل الأهداف التي لم تقاس بعد
         valid = [t for t in targets if t.avg_response_time > 0]
         if not valid:
             return random.choice(targets)
@@ -195,7 +200,6 @@ class RequestRouter:
         return min(valid, key=lambda t: t.avg_response_time)
     
     def _select_sticky(self, targets: List[RouteTarget], session_id: str = None) -> Optional[RouteTarget]:
-        """اختيار هدف ثابت للجلسة"""
         if not session_id:
             return self._select_round_robin(targets)
         
@@ -205,19 +209,16 @@ class RequestRouter:
                 if target.id == target_id and target.is_healthy:
                     return target
         
-        # اختيار هدف جديد
         target = self._select_round_robin(targets)
         if target:
             self._sticky_map[session_id] = target.id
         return target
     
     async def get_target(self, session_id: str = None) -> Optional[RouteTarget]:
-        """الحصول على هدف مناسب حسب الاستراتيجية"""
         async with self._lock:
             targets = self.get_healthy_targets()
             
             if not targets:
-                # إذا لم يكن هناك أهداف سليمة، استخدم أي هدف
                 targets = self._targets
                 if not targets:
                     return None
@@ -244,7 +245,6 @@ class RequestRouter:
             return target
     
     def record_result(self, target_id: str, success: bool, response_time: float = 0.0):
-        """تسجيل نتيجة استخدام هدف"""
         async with self._lock:
             target = self._targets_by_id.get(target_id)
             if not target:
@@ -258,32 +258,21 @@ class RequestRouter:
                 self._stats["failed_routes"] += 1
     
     def set_strategy(self, strategy: RoutingStrategy):
-        """تغيير استراتيجية التوجيه"""
         self.strategy = strategy
         self._stats["strategy_changes"] += 1
     
     async def health_check_all(self, test_url: str = "https://httpbin.org/ip"):
-        """فحص صحة جميع الأهداف"""
-        import aiohttp
-        
         async def check_target(target: RouteTarget) -> bool:
             try:
-                start = time.time()
-                connector = aiohttp.TCPConnector()
-                async with aiohttp.ClientSession(connector=connector) as session:
-                    async with session.get(
-                        test_url,
-                        proxy=target.full_url if target.is_proxy else None,
-                        timeout=aiohttp.ClientTimeout(total=10)
-                    ) as response:
-                        response_time = (time.time() - start) * 1000
-                        if response.status == 200:
-                            target.record_success(response_time)
-                            return True
-                        else:
-                            target.record_failure()
-                            return False
-            except Exception:
+                success, response_time = await self._send_request_via_target(target, test_url)
+                if success:
+                    target.record_success(response_time)
+                    return True
+                else:
+                    target.record_failure()
+                    return False
+            except Exception as e:
+                logger.debug(f"Health check failed for {target.url}: {e}")
                 target.record_failure()
                 return False
         
@@ -293,12 +282,11 @@ class RequestRouter:
             return sum(results)
     
     def get_stats(self) -> Dict:
-        """إحصائيات التوجيه"""
         targets_stats = []
         for target in self._targets:
             targets_stats.append({
                 "id": target.id,
-                "url": target.url[:40] + "...",
+                "url": target.url[:40] + "..." if len(target.url) > 40 else target.url,
                 "weight": target.weight,
                 "is_proxy": target.is_proxy,
                 "success_rate": target.success_rate,
@@ -308,19 +296,21 @@ class RequestRouter:
                 "load": target.load
             })
         
+        total = self._stats["total_routes"]
+        success_rate = self._stats["successful_routes"] / max(1, total)
+        
         return {
             "strategy": self.strategy.value,
             "total_targets": len(self._targets),
             "healthy_targets": len(self.get_healthy_targets()),
             "targets": targets_stats,
-            "total_routes": self._stats["total_routes"],
-            "success_rate": self._stats["successful_routes"] / max(1, self._stats["total_routes"]),
+            "total_routes": total,
+            "success_rate": success_rate,
             "sticky_sessions": len(self._sticky_map),
             "strategy_changes": self._stats["strategy_changes"]
         }
     
     def reset_stats(self):
-        """إعادة تعيين الإحصائيات"""
         self._stats = {
             "total_routes": 0,
             "successful_routes": 0,
@@ -329,19 +319,23 @@ class RequestRouter:
         }
     
     def clear(self):
-        """مسح جميع الأهداف"""
         self._targets.clear()
         self._targets_by_id.clear()
         self._sticky_map.clear()
         self._current_index = 0
         self.reset_stats()
+    
+    async def close(self):
+        """إغلاق الموجه"""
+        self._http_client = None
+        logger.info("RequestRouter closed")
 
 
 def create_request_router(
     strategy: str = "round_robin",
-    proxies: List[str] = None
+    proxies: List[str] = None,
+    http_client=None
 ) -> RequestRouter:
-    """إنشاء موجه طلبات جديد"""
     strategy_map = {
         "round_robin": RoutingStrategy.ROUND_ROBIN,
         "random": RoutingStrategy.RANDOM,
@@ -351,7 +345,7 @@ def create_request_router(
         "sticky": RoutingStrategy.STICKY
     }
     
-    router = RequestRouter(strategy=strategy_map.get(strategy, RoutingStrategy.ROUND_ROBIN))
+    router = RequestRouter(strategy=strategy_map.get(strategy, RoutingStrategy.ROUND_ROBIN), http_client=http_client)
     
     if proxies:
         for proxy in proxies:
@@ -361,4 +355,3 @@ def create_request_router(
                 router.add_target(proxy)
     
     return router
-

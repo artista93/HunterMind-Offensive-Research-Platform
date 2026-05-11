@@ -1,4 +1,3 @@
-
 import asyncio
 import re
 import html
@@ -8,19 +7,6 @@ from dataclasses import dataclass
 
 from .base_scanner import BaseScanner, ScanContext, Finding, Severity, Confidence
 
-try:
-    from bs4 import BeautifulSoup
-    BEAUTIFULSOUP_AVAILABLE = True
-except ImportError:
-    BEAUTIFULSOUP_AVAILABLE = False
-
-try:
-    import httpx
-    HTTPX_AVAILABLE = True
-except ImportError:
-    HTTPX_AVAILABLE = False
-    import aiohttp
-
 import logging
 
 logger = logging.getLogger(__name__)
@@ -28,12 +14,11 @@ logger = logging.getLogger(__name__)
 
 @dataclass
 class XSSPayload:
-    """حمولة XSS"""
     name: str
     payload: str
-    category: str  # reflected, stored, dom
-    context: str   # html, attribute, javascript, css
-    encoding: str  # none, url, html, base64
+    category: str
+    context: str
+    encoding: str
     description: str = ""
 
 
@@ -50,7 +35,6 @@ class XSSScanner(BaseScanner):
     - التحقق من التنفيذ الفعلي
     """
     
-    # قائمة الحمولات الأساسية
     BASE_PAYLOADS = [
         # HTML Context
         XSSPayload("Basic HTML", "<script>alert('XSS')</script>", "reflected", "html", "none"),
@@ -79,7 +63,6 @@ class XSSScanner(BaseScanner):
         XSSPayload("Data Protocol", "data:text/html,<script>alert('XSS')</script>", "reflected", "attribute", "none"),
     ]
     
-    # إشارات نجاح XSS
     SUCCESS_INDICATORS = [
         r'<script>.*?alert.*?</script>',
         r'on\w+\s*=',
@@ -106,67 +89,42 @@ class XSSScanner(BaseScanner):
         )
         self._verify_execution = verify_execution
         self._custom_payloads = custom_payloads or []
-        self._session = None
         self._tested_params: Set[str] = set()
     
-    async def _get_session(self):
-        """الحصول على جلسة HTTP"""
-        if not self._session:
-            if HTTPX_AVAILABLE:
-                self._session = httpx.AsyncClient(
-                    timeout=self.timeout,
-                    follow_redirects=True,
-                    verify=False
-                )
-            else:
-                self._session = aiohttp.ClientSession()
-        return self._session
-    
     async def can_scan(self, context: ScanContext) -> bool:
-        """التحقق من وجود معاملات قابلة للاختبار"""
         url = context.target.url
         
-        # استخراج المعاملات من URL
         parsed = urlparse(url)
         params = parse_qs(parsed.query)
         
-        # المعاملات في POST data
         post_params = context.target.data or {}
         
         return len(params) > 0 or len(post_params) > 0
     
     async def scan(self, context: ScanContext) -> List[Finding]:
-        """تنفيذ فحص XSS"""
         findings = []
         url = context.target.url
-        method = context.target.method
         params = context.target.params.copy()
         data = context.target.data.copy() if context.target.data else {}
         
-        # استخراج المعاملات من URL
         parsed = urlparse(url)
         query_params = parse_qs(parsed.query)
         
-        # دمج جميع المعاملات
         all_params = {}
         for key, values in query_params.items():
             all_params[key] = values[0] if values else ""
         all_params.update(params)
         
-        # دمج معاملات POST
         all_post_params = data.copy()
         
-        # اختبار كل معامل
         for param_name, param_value in all_params.items():
             if param_name in self._tested_params:
                 continue
             self._tested_params.add(param_name)
             
             for payload in self.BASE_PAYLOADS + self._custom_payloads:
-                # تطبيق الترميز
                 encoded_payload = self._apply_encoding(payload.payload, payload.encoding)
                 
-                # اختبار في GET parameter
                 modified_params = all_params.copy()
                 modified_params[param_name] = encoded_payload
                 
@@ -182,9 +140,8 @@ class XSSScanner(BaseScanner):
                 
                 if finding:
                     findings.append(finding)
-                    break  # توقف عن اختبار هذا المعامل إذا تم العثور على ثغرة
+                    break
         
-        # اختبار معاملات POST
         for param_name, param_value in all_post_params.items():
             if f"POST:{param_name}" in self._tested_params:
                 continue
@@ -218,40 +175,16 @@ class XSSScanner(BaseScanner):
         payload: XSSPayload,
         method: str = "GET"
     ) -> Optional[Finding]:
-        """اختبار حمولة واحدة في GET request"""
-        session = await self._get_session()
-        
         try:
-            if HTTPX_AVAILABLE:
-                if method == "GET":
-                    response = await session.get(url, headers=context.target.headers)
-                else:
-                    response = await session.post(url, headers=context.target.headers)
-            else:
-                # aiohttp fallback
-                if method == "GET":
-                    async with session.get(url, headers=context.target.headers) as resp:
-                        response_text = await resp.text()
-                        response_url = str(resp.url)
-                else:
-                    async with session.post(url, headers=context.target.headers, data=context.target.data) as resp:
-                        response_text = await resp.text()
-                        response_url = str(resp.url)
-                response = type('Response', (), {'text': response_text, 'url': response_url})()
+            body = await self.send_request(url, method=method, headers=context.target.headers)
             
-            # تحليل الاستجابة
-            body = response.text if hasattr(response, 'text') else str(response)
-            
-            # البحث عن إشارات نجاح
-            if self._detect_xss_in_response(body, payload.payload):
-                # التحقق من التنفيذ الفعلي
+            if body and self._detect_xss_in_response(body, payload.payload):
                 executed = False
                 if self._verify_execution:
                     executed = await self._verify_execution_in_browser(url, payload.payload)
                 
                 confidence = Confidence.HIGH if executed else Confidence.MEDIUM
                 
-                # إنشاء تقرير
                 finding = self.add_finding(
                     vulnerability_type="Cross-Site Scripting (XSS)",
                     severity=Severity.HIGH,
@@ -279,18 +212,10 @@ class XSSScanner(BaseScanner):
         payload: XSSPayload,
         data: Dict[str, str]
     ) -> Optional[Finding]:
-        """اختبار حمولة واحدة في POST request"""
-        session = await self._get_session()
-        
         try:
-            if HTTPX_AVAILABLE:
-                response = await session.post(url, data=data, headers=context.target.headers)
-                body = response.text
-            else:
-                async with session.post(url, data=data, headers=context.target.headers) as resp:
-                    body = await resp.text()
+            body = await self.send_request(url, method="POST", data=data, headers=context.target.headers)
             
-            if self._detect_xss_in_response(body, payload.payload):
+            if body and self._detect_xss_in_response(body, payload.payload):
                 finding = self.add_finding(
                     vulnerability_type="Cross-Site Scripting (XSS)",
                     severity=Severity.HIGH,
@@ -311,12 +236,9 @@ class XSSScanner(BaseScanner):
         return None
     
     def _detect_xss_in_response(self, response_body: str, payload: str) -> bool:
-        """كشف وجود حمولة XSS في الاستجابة"""
-        # البحث عن الحمولة نفسها
         if payload in response_body:
             return True
         
-        # البحث عن إشارات نجاح XSS
         for pattern in self.SUCCESS_INDICATORS:
             if re.search(pattern, response_body, re.IGNORECASE):
                 return True
@@ -324,11 +246,6 @@ class XSSScanner(BaseScanner):
         return False
     
     async def _verify_execution_in_browser(self, url: str, payload: str) -> bool:
-        """
-        التحقق من تنفيذ XSS فعلياً باستخدام متصفح
-        
-        يتم استخدام Playwright للتحقق من التنفيذ
-        """
         try:
             from playwright.async_api import async_playwright
             
@@ -336,7 +253,6 @@ class XSSScanner(BaseScanner):
                 browser = await p.chromium.launch(headless=True)
                 page = await browser.new_page()
                 
-                # إعداد مستمع للتنبيهات
                 alert_triggered = False
                 
                 async def handle_dialog(dialog):
@@ -346,15 +262,9 @@ class XSSScanner(BaseScanner):
                 
                 page.on("dialog", handle_dialog)
                 
-                # انتظار رسالة console
-                console_messages = []
-                page.on("console", lambda msg: console_messages.append(msg.text))
-                
-                # فتح الصفحة
                 await page.goto(url, wait_until="networkidle")
                 
-                # البحث عن إشارات التنفيذ
-                executed = alert_triggered or len(console_messages) > 0
+                executed = alert_triggered
                 
                 await browser.close()
                 return executed
@@ -364,7 +274,6 @@ class XSSScanner(BaseScanner):
             return False
     
     def _apply_encoding(self, payload: str, encoding: str) -> str:
-        """تطبيق ترميز على الحمولة"""
         from urllib.parse import quote, quote_plus
         
         if encoding == "url":
@@ -380,7 +289,6 @@ class XSSScanner(BaseScanner):
             return payload
     
     def _build_url(self, base_url: str, params: Dict[str, str]) -> str:
-        """بناء URL مع معاملات"""
         parsed = list(urlparse(base_url))
         current_params = parse_qs(parsed[4])
         
@@ -391,16 +299,5 @@ class XSSScanner(BaseScanner):
         return urlunparse(parsed)
     
     def add_custom_payload(self, payload: XSSPayload):
-        """إضافة حمولة مخصصة"""
         self._custom_payloads.append(payload)
         logger.info(f"Added custom XSS payload: {payload.name}")
-    
-    async def close(self):
-        """إغلاق الجلسة"""
-        if self._session:
-            if HTTPX_AVAILABLE:
-                await self._session.aclose()
-            else:
-                await self._session.close()
-            self._session = None
-

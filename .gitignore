@@ -1,0 +1,29 @@
+# --- Python Specific ---
+venv/
+.venv/
+env/
+__pycache__/
+*.py[cod]
+*$py.class
+.Python
+
+# --- ML & Data (ضخمة جداً للرفع العادي) ---
+datasets/
+models/*.pth
+models/*.h5
+storage/*.db
+storage/*.sqlite
+
+# --- Project Specific ---
+.env
+.vscode/
+.idea/
+node_modules/
+
+# --- Logs & Telemetry ---
+logs/
+*.log
+telemetry/data/
+
+# --- Large Binaries (مثل مشكلة Playwright) ---
+*/playwright/driver/

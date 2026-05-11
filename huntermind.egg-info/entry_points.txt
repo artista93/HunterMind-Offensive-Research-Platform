@@ -1,0 +1,4 @@
+[console_scripts]
+huntermind = cli:main
+huntermind-api = interfaces.api.fastapi_server:main
+huntermind-dashboard = interfaces.dashboard.dashboard_server:main

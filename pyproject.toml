@@ -1,70 +1,66 @@
 [build-system]
-requires = ["setuptools>=45.0.0", "wheel", "poetry-core>=1.0.0"]
-build-backend = "poetry.core.masonry.api"
+requires = ["setuptools>=45.0.0", "wheel"]
+build-backend = "setuptools.build_meta"
 
-[tool.poetry]
+[project]
 name = "huntermind"
 version = "1.0.0"
 description = "Autonomous Offensive Security Intelligence Platform"
-authors = ["HunterMind Team <artistajaafari@gmail.com>"]
-license = "MIT"
+authors = [{name = "HunterMind Team", email = "artistajaafari@gmail.com"}]
+license = {text = "MIT"}
 readme = "README.md"
-repository = "https://github.com/akkalighter/HunterMind_Offensive_Research_Platform"
-keywords = ["security", "offensive", "pentesting", "automation", "ai", "ml"]
+requires-python = ">=3.9"
+dependencies = [
+    "aiohttp>=3.8.0",
+    "httpx>=0.24.0",
+    "fastapi>=0.100.0",
+    "uvicorn>=0.23.0",
+    "websockets>=12.0",
+    "playwright>=1.40.0",
+    "beautifulsoup4>=4.12.0",
+    "numpy>=1.24.0",
+    "pydantic>=2.0.0",
+    "pyyaml>=6.0",
+    "python-dotenv>=1.0.0",
+    "psutil>=5.9.0",
+]
 
-[tool.poetry.dependencies]
-python = "^3.9"
-aiohttp = "^3.8"
-httpx = "^0.24"
-fastapi = "^0.100"
-uvicorn = "^0.23"
-playwright = "^1.40"
-tensorflow = "^2.13"
-torch = "^2.0"
-numpy = "^1.24"
-pandas = "^2.0"
-scikit-learn = "^1.3"
-psutil = "^5.9"
+[project.optional-dependencies]
+gpu = [
+    "tensorflow>=2.13.0",
+    "torch>=2.0.0",
+]
+research = [
+    "jupyter>=1.0.0",
+    "matplotlib>=3.7.0",
+    "pandas>=2.0.0",
+]
+dev = [
+    "pytest>=7.4.0",
+    "pytest-asyncio>=0.21.0",
+    "pytest-cov>=4.1.0",
+    "black>=23.7.0",
+    "ruff>=0.0.285",
+]
 
-[tool.poetry.group.dev.dependencies]
-pytest = "^7.4"
-pytest-asyncio = "^0.21"
-pytest-cov = "^4.1"
-black = "^23.7"
-ruff = "^0.0.285"
-mypy = "^1.4"
-pre-commit = "^3.3"
-
-[tool.poetry.scripts]
+[project.scripts]
 huntermind = "cli:main"
 huntermind-api = "interfaces.api.fastapi_server:main"
 huntermind-dashboard = "interfaces.dashboard.dashboard_server:main"
 
+[tool.setuptools.packages.find]
+include = ["offensive*", "agents*", "cognition*", "learning*", "orchestration*", "interfaces*", "infrastructure*", "storage*", "telemetry*", "schemas*"]
+exclude = ["tests*", "docs*", "datasets*", "models*", "scripts*"]
+
 [tool.black]
 line-length = 100
 target-version = ['py39']
-include = '\.pyi?$'
 
 [tool.ruff]
 line-length = 100
-select = ["E", "F", "W", "I", "N", "UP", "B", "C4", "SIM"]
-ignore = ["E501", "B008"]
-
-[tool.mypy]
-python_version = "3.9"
-warn_return_any = true
-warn_unused_configs = true
-disallow_untyped_defs = false
+select = ["E", "F", "W", "I"]
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 testpaths = ["tests"]
 addopts = "-v --cov=offensive --cov=agents --cov=cognition --cov-report=html"
-
-[tool.coverage.run]
-source = ["offensive", "agents", "cognition", "learning", "orchestration"]
-omit = ["*/tests/*", "*/__pycache__/*"]
-
-[tool.isort]
-profile = "black"
-line_length = 100

@@ -1,13 +1,17 @@
+"""
+Agent Registry - سجل الوكلاء
+يدير تسجيل واكتشاف وتنسيق جميع الوكلاء في المنصة
+"""
 
 import asyncio
 import uuid
-from typing import Dict, List, Optional, Any, Set, Tuple
+from typing import Dict, List, Optional, Any, Set
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
 
-from .base_agent import BaseAgent, AgentPriority, AgentState
-from .agent_state import AgentStateManager
+from agents.base.base_agent import BaseAgent, AgentPriority, AgentState
+from agents.base.agent_state import AgentStateManager
 
 import logging
 
@@ -432,8 +436,12 @@ class AgentRegistry:
         async with self._lock:
             agents_by_state = {}
             for info in self._agents_info.values():
-                state = info.state.value
-                agents_by_state[state] = agents_by_state.get(state, 0) + 1
+                # Fixed: handle both Enum and string state
+              if hasattr(info.state, 'value'):
+                   state = info.state.value
+              else:
+                   state = str(info.state)
+              agents_by_state[state] = agents_by_state.get(state, 0) + 1
             
             return {
                 **self._stats,
@@ -472,4 +480,3 @@ def get_agent_registry() -> AgentRegistry:
     if _default_registry is None:
         _default_registry = AgentRegistry()
     return _default_registry
-

@@ -1,6 +1,10 @@
+"""
+Cache Manager - مدير التخزين المؤقت
+يدير التخزين المؤقت للبيانات لتحسين أداء النظام
+"""
 
 import asyncio
-from typing import Dict, List, Optional, Any, Set, Tuple
+from typing import Dict, List, Optional, Any
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from collections import OrderedDict
@@ -24,12 +28,6 @@ class CacheEntry:
 class CacheManager:
     """
     مدير التخزين المؤقت المتقدم
-    
-    الميزات:
-    - تخزين مؤقت مع انتهاء صلاحية
-    - استراتيجيات الإخلاء (LRU, LFU, FIFO)
-    - تنظيف تلقائي
-    - إحصائيات الأداء
     """
     
     def __init__(self, max_size: int = 1000, default_ttl: int = 3600, strategy: str = "lru"):
@@ -37,6 +35,7 @@ class CacheManager:
         self.default_ttl = default_ttl
         self.strategy = strategy
         self.cache: Dict[str, CacheEntry] = {}
+        self.access_order: List[str] = []  # لتتبع ترتيب الوصول (LRU)
         self._lock = asyncio.Lock()
         self._cleanup_task: Optional[asyncio.Task] = None
         self._running = False
@@ -89,27 +88,24 @@ class CacheManager:
             # التحقق من انتهاء الصلاحية
             if entry.expires_at and datetime.now() > entry.expires_at:
                 del self.cache[key]
+                if key in self.access_order:
+                    self.access_order.remove(key)
                 self.misses += 1
                 return None
             
-            # تحديث الإحصائيات
+            # تحديث إحصائيات
             entry.access_count += 1
             entry.last_accessed = datetime.now()
             
-            # تحديث الترتيب حسب الاستراتيجية
-            if self.strategy == "lru":
-                # نقل إلى النهاية (الأحدث)
-                self.cache.move_to_end(key)
+            # تحديث ترتيب الوصول (LRU)
+            if key in self.access_order:
+                self.access_order.remove(key)
+            self.access_order.append(key)
             
             self.hits += 1
             return entry.value
     
-    async def set(
-        self,
-        key: str,
-        value: Any,
-        ttl: int = None
-    ):
+    async def set(self, key: str, value: Any, ttl: int = None):
         """
         تخزين قيمة في التخزين المؤقت
         
@@ -129,7 +125,13 @@ class CacheManager:
                 expires_at=expires_at
             )
             
+            # إزالة المفتاح القديم إذا كان موجوداً
+            if key in self.cache:
+                if key in self.access_order:
+                    self.access_order.remove(key)
+            
             self.cache[key] = entry
+            self.access_order.append(key)
             
             # تطبيق استراتيجية الإخلاء
             await self._evict_if_needed()
@@ -149,6 +151,8 @@ class CacheManager:
         async with self._lock:
             if key in self.cache:
                 del self.cache[key]
+                if key in self.access_order:
+                    self.access_order.remove(key)
                 logger.debug(f"Deleted from cache: {key}")
                 return True
             return False
@@ -157,23 +161,30 @@ class CacheManager:
         """مسح التخزين المؤقت بالكامل"""
         async with self._lock:
             self.cache.clear()
+            self.access_order.clear()
             logger.info("Cache cleared")
     
     async def _evict_if_needed(self):
         """إخلاء عناصر إذا تجاوز الحجم"""
         while len(self.cache) > self.max_size:
             if self.strategy == "lru":
-                # إزالة أقدم عنصر (LRU)
-                key = next(iter(self.cache))
+                # إزالة أقدم عنصر (LRU) - أول عنصر في قائمة الوصول
+                if self.access_order:
+                    oldest_key = self.access_order.pop(0)
+                    del self.cache[oldest_key]
+                    logger.debug(f"Evicted from cache (LRU): {oldest_key}")
             elif self.strategy == "lfu":
                 # إزالة أقل عنصر استخداماً (LFU)
-                key = min(self.cache.items(), key=lambda x: x[1].access_count)[0]
+                min_key = min(self.cache.items(), key=lambda x: x[1].access_count)[0]
+                del self.cache[min_key]
+                if min_key in self.access_order:
+                    self.access_order.remove(min_key)
+                logger.debug(f"Evicted from cache (LFU): {min_key}")
             else:  # fifo
-                # إزالة أقدم عنصر (FIFO)
-                key = next(iter(self.cache))
-            
-            del self.cache[key]
-            logger.debug(f"Evicted from cache: {key}")
+                if self.access_order:
+                    oldest_key = self.access_order.pop(0)
+                    del self.cache[oldest_key]
+                    logger.debug(f"Evicted from cache (FIFO): {oldest_key}")
     
     async def _cleanup_loop(self):
         """حلقة تنظيف العناصر منتهية الصلاحية"""
@@ -189,6 +200,8 @@ class CacheManager:
                 
                 for key in expired_keys:
                     del self.cache[key]
+                    if key in self.access_order:
+                        self.access_order.remove(key)
                 
                 if expired_keys:
                     logger.debug(f"Cleaned {len(expired_keys)} expired cache entries")
@@ -207,4 +220,3 @@ class CacheManager:
             "strategy": self.strategy,
             "default_ttl": self.default_ttl
         }
-

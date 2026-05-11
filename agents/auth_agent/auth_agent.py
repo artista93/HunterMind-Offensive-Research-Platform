@@ -1,4 +1,3 @@
-
 import asyncio
 import re
 import base64
@@ -22,15 +21,13 @@ class AuthAgent(BaseAgent):
     
     الميزات:
     - اختبار قوة كلمات المرور
-    - اكتشاف ثغرات JWT (alg none, weak secret, expired)
+    - اكتشاف ثغرات JWT
     - اختبار Session Fixation
     - كشف نقاط نهاية المصادقة غير المحمية
     - تخمين كلمات المرور الضعيفة
-    - اختبار تسجيل الدخول
     - تكامل مع ذاكرة الاستغلال
     """
     
-    # كلمات مرور ضعيفة شائعة
     COMMON_PASSWORDS = [
         "password", "123456", "12345678", "1234", "qwerty", "abc123",
         "admin", "letmein", "welcome", "monkey", "dragon", "master",
@@ -38,7 +35,6 @@ class AuthAgent(BaseAgent):
         "root", "toor", "secret", "changeme", "default"
     ]
     
-    # أسماء مستخدمين شائعة
     COMMON_USERNAMES = [
         "admin", "administrator", "root", "user", "test", "guest",
         "support", "info", "webmaster", "admin1", "admin123"
@@ -57,8 +53,8 @@ class AuthAgent(BaseAgent):
         self._rate_limit = rate_limit
         self._timeout = timeout
         self._max_attempts = max_attempts
+        self._http_client = None
         
-        # مكونات المصادقة
         self._scanner = AuthScanner(
             rate_limit=rate_limit,
             timeout=timeout,
@@ -68,7 +64,6 @@ class AuthAgent(BaseAgent):
         )
         self._memory = get_exploit_memory()
         
-        # نتائج الفحص
         self._scan_results: Dict[str, List[Finding]] = {}
         self._active_scans: Set[str] = set()
         self._discovered_credentials: List[Dict] = []
@@ -76,32 +71,39 @@ class AuthAgent(BaseAgent):
         
         logger.info(f"AuthAgent initialized: {name}")
     
+    def set_http_client(self, client):
+        """تعيين عميل HTTP"""
+        self._http_client = client
+        if hasattr(self._scanner, 'set_http_client'):
+            self._scanner.set_http_client(client)
+    
+    async def _send_request(
+        self,
+        url: str,
+        method: str = "POST",
+        data: Dict = None,
+        headers: Dict = None
+    ) -> tuple:
+        """إرسال طلب HTTP"""
+        if self._http_client and hasattr(self._http_client, 'send_request'):
+            response = await self._http_client.send_request(
+                url, method=method, data=data, headers=headers
+            )
+            return response, 200 if response else 404
+        return None, 0
+    
     async def _on_initialize(self):
-        """تهيئة الوكيل"""
         logger.info("Initializing AuthAgent components...")
     
     async def _on_start(self):
-        """بدء تشغيل الوكيل"""
         logger.info("AuthAgent started")
     
     async def _on_stop(self):
-        """إيقاف تشغيل الوكيل"""
         for scan_id in list(self._active_scans):
             await self.stop_scan(scan_id)
-        await self._scanner.close()
         logger.info("AuthAgent stopped")
     
     async def _handle_message(self, message: AgentMessage) -> Optional[AgentMessage]:
-        """
-        معالجة الرسائل الواردة
-        
-        أنواع الرسائل المدعومة:
-        - start_scan: بدء فحص المصادقة
-        - stop_scan: إيقاف فحص
-        - get_findings: الحصول على النتائج
-        - test_login: اختبار تسجيل الدخول
-        - analyze_jwt: تحليل JWT
-        """
         if message.type == "start_scan":
             result = await self.start_scan(message.content)
             return AgentMessage(
@@ -162,19 +164,6 @@ class AuthAgent(BaseAgent):
         cookies: Dict[str, str] = None,
         options: Dict[str, Any] = None
     ) -> Dict[str, Any]:
-        """
-        بدء فحص المصادقة
-        
-        Args:
-            target_url: الرابط المستهدف
-            login_url: رابط تسجيل الدخول
-            headers: هيدرات مخصصة
-            cookies: كوكيز
-            options: خيارات إضافية
-        
-        Returns:
-            معلومات الفحص
-        """
         self._state_manager.transition_to(
             AgentStateEnum.BUSY,
             reason=f"Starting auth scan of {target_url}"
@@ -198,7 +187,6 @@ class AuthAgent(BaseAgent):
             self._scan_results[scan_id] = findings
             self._context.tasks_completed += 1
             
-            # تخزين في الذاكرة
             for finding in findings:
                 if finding.confidence in [Confidence.HIGH, Confidence.CERTAIN]:
                     self._memory.store_exploit(
@@ -231,15 +219,12 @@ class AuthAgent(BaseAgent):
             self._state_manager.transition_to(AgentStateEnum.IDLE, reason="Scan completed")
     
     async def stop_scan(self, scan_id: str) -> bool:
-        """إيقاف فحص قيد التنفيذ"""
         if scan_id not in self._active_scans:
             return False
-        await self._scanner.close()
         self._active_scans.discard(scan_id)
         return True
     
     async def get_findings(self, scan_id: str = None) -> List[Finding]:
-        """الحصول على نتائج الفحص"""
         if scan_id and scan_id in self._scan_results:
             return self._scan_results[scan_id]
         if self._scan_results:
@@ -250,17 +235,6 @@ class AuthAgent(BaseAgent):
         self,
         data: Dict[str, Any]
     ) -> Dict[str, Any]:
-        """
-        اختبار تسجيل الدخول بمجموعة من البيانات
-        
-        Args:
-            data: معلومات الاختبار (url, username_field, password_field, credentials)
-        
-        Returns:
-            نتيجة الاختبار
-        """
-        import httpx
-        
         url = data.get("url")
         username_field = data.get("username_field", "username")
         password_field = data.get("password_field", "password")
@@ -273,54 +247,43 @@ class AuthAgent(BaseAgent):
         }
         
         if not credentials:
-            # استخدام القوائم الافتراضية
             for username in self.COMMON_USERNAMES[:5]:
                 for password in self.COMMON_PASSWORDS[:self._max_attempts // 5]:
                     credentials.append({"username": username, "password": password})
         
-        async with httpx.AsyncClient(timeout=self._timeout) as client:
-            for cred in credentials[:self._max_attempts]:
-                try:
-                    response = await client.post(
-                        url,
-                        data={
-                            username_field: cred["username"],
-                            password_field: cred["password"]
-                        },
-                        follow_redirects=False
-                    )
-                    
-                    result = {
-                        "username": cred["username"],
-                        "password": cred["password"],
-                        "status_code": response.status_code
+        for cred in credentials[:self._max_attempts]:
+            try:
+                response_text, status_code = await self._send_request(
+                    url,
+                    method="POST",
+                    data={
+                        username_field: cred["username"],
+                        password_field: cred["password"]
                     }
-                    
-                    if response.status_code in [200, 302, 303]:
-                        result["success"] = True
-                        results["successful"].append(result)
-                        self._discovered_credentials.append(result)
-                    else:
-                        result["success"] = False
-                        results["failed"].append(result)
-                    
-                    results["total_tested"] += 1
-                    
-                except Exception as e:
-                    logger.debug(f"Login test error: {e}")
+                )
+                
+                result = {
+                    "username": cred["username"],
+                    "password": cred["password"],
+                    "status_code": status_code
+                }
+                
+                if status_code in [200, 302, 303]:
+                    result["success"] = True
+                    results["successful"].append(result)
+                    self._discovered_credentials.append(result)
+                else:
+                    result["success"] = False
+                    results["failed"].append(result)
+                
+                results["total_tested"] += 1
+                
+            except Exception as e:
+                logger.debug(f"Login test error: {e}")
         
         return results
     
     async def analyze_jwt(self, token: str) -> Dict[str, Any]:
-        """
-        تحليل توكن JWT
-        
-        Args:
-            token: توكن JWT
-        
-        Returns:
-            تحليل التوكن
-        """
         result = {
             "valid": False,
             "algorithm": None,
@@ -332,7 +295,6 @@ class AuthAgent(BaseAgent):
         try:
             import jwt
             
-            # فك التشفير بدون تحقق
             headers = jwt.get_unverified_header(token)
             payload = jwt.decode(token, options={"verify_signature": False})
             
@@ -340,7 +302,6 @@ class AuthAgent(BaseAgent):
             result["payload"] = payload
             result["valid"] = True
             
-            # التحقق من خوارزمية none
             if result["algorithm"] == "none":
                 result["issues"].append({
                     "type": "none_algorithm",
@@ -348,7 +309,6 @@ class AuthAgent(BaseAgent):
                     "description": "JWT uses 'none' algorithm which allows token forgery"
                 })
             
-            # التحقق من انتهاء الصلاحية
             exp = payload.get("exp")
             if exp:
                 import time
@@ -360,7 +320,6 @@ class AuthAgent(BaseAgent):
                         "description": "JWT token has expired"
                     })
             
-            # التحقق من معلومات حساسة
             sensitive_fields = ["password", "secret", "key", "token"]
             for field in sensitive_fields:
                 if field in payload:
@@ -379,7 +338,6 @@ class AuthAgent(BaseAgent):
         return result
     
     async def generate_report(self, scan_id: str = None, format: str = "json") -> str:
-        """توليد تقرير عن نتائج الفحص"""
         findings = await self.get_findings(scan_id)
         
         if format == "json":
@@ -454,4 +412,3 @@ async def get_auth_agent() -> AuthAgent:
         await _default_auth_agent.initialize()
         await _default_auth_agent.start()
     return _default_auth_agent
-

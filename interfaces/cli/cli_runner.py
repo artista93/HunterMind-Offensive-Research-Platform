@@ -1,10 +1,20 @@
+"""
+CLI Runner - مشغل واجهة الأوامر (متصل بالمشروع الحقيقي)
+"""
 
 import argparse
 import asyncio
-import json
 import sys
-from typing import Dict, List, Optional, Any
+from typing import List
 from datetime import datetime
+
+from .terminal_ui import TerminalUI, Color
+
+# استيراد المكونات الحقيقية
+from offensive.scanners.xss_scanner import XSSScanner
+from offensive.scanners.sqli_scanner import SQLiScanner
+from offensive.scanners.idor_scanner import IDORScanner
+from offensive.scanners.base_scanner import ScanContext, ScanTarget
 
 import logging
 
@@ -14,17 +24,15 @@ logger = logging.getLogger(__name__)
 
 class CLIRunner:
     """
-    مشغل واجهة الأوامر المتقدم
-    
-    الميزات:
-    - أوامر تفاعلية للتحكم في المنصة
-    - دعم السكربتات
-    - مخرجات منسقة
-    - تاريخ الأوامر
+    مشغل واجهة الأوامر المتصل بالمشروع الحقيقي
     """
     
     def __init__(self):
+        self.ui = TerminalUI()
         self.history: List[str] = []
+        self.scans = []  # تخزين نتائج الفحوصات الحقيقية
+        self.vulnerabilities = []  # تخزين الثغرات الحقيقية
+        
         self.commands = {
             "scan": self.cmd_scan,
             "attack": self.cmd_attack,
@@ -37,27 +45,24 @@ class CLIRunner:
             "quit": self.cmd_exit
         }
         
-        logger.info("CLI Runner initialized")
+        logger.info("CLI Runner initialized (REAL mode)")
     
     async def run(self, args: argparse.Namespace):
         """تشغيل CLI"""
         if args.command:
-            # تنفيذ أمر واحد
             await self.execute_command(args.command, args)
         else:
-            # وضع تفاعلي
             await self.interactive_mode()
     
     async def interactive_mode(self):
         """الوضع التفاعلي"""
-        print("\n" + "=" * 60)
-        print("🦅 HunterMind Offensive Security Platform")
-        print("=" * 60)
+        self.ui.clear_screen()
+        self.ui.print_banner()
         print("Type 'help' for available commands, 'exit' to quit\n")
         
         while True:
             try:
-                command = input("huntermind> ").strip()
+                command = input(f"{Color.BRIGHT_CYAN}huntermind> {Color.RESET}").strip()
                 
                 if not command:
                     continue
@@ -73,13 +78,10 @@ class CLIRunner:
             except KeyboardInterrupt:
                 print("\nGoodbye!")
                 break
-            except EOFError:
-                print("\nGoodbye!")
-                break
             except Exception as e:
-                print(f"Error: {e}")
+                print(f"{Color.RED}Error: {e}{Color.RESET}")
     
-    async def execute_command(self, command: str, args: Optional[argparse.Namespace]):
+    async def execute_command(self, command: str, args: argparse.Namespace):
         """تنفيذ أمر"""
         parts = command.split()
         cmd_name = parts[0].lower()
@@ -90,102 +92,142 @@ class CLIRunner:
             print(f"Unknown command: {cmd_name}. Type 'help' for available commands.")
     
     async def cmd_scan(self, args: List[str], cli_args):
-        """تنفيذ أمر الفحص"""
+        """تنفيذ فحص حقيقي"""
         if not args:
-            print("Usage: scan <target_url> [--depth N] [--pages N]")
+            print("Usage: scan <target_url>")
             return
         
         target_url = args[0]
-        depth = 3
-        pages = 100
         
-        # تحليل المعاملات الإضافية
-        for i, arg in enumerate(args[1:]):
-            if arg == "--depth" and i + 1 < len(args) - 1:
-                depth = int(args[i + 2])
-            elif arg == "--pages" and i + 1 < len(args) - 1:
-                pages = int(args[i + 2])
+        print(f"\n{Color.BRIGHT_CYAN}🔍 Starting REAL scan on {target_url}{Color.RESET}\n")
         
-        print(f"\n🔍 Starting scan on {target_url}")
-        print(f"   Depth: {depth}, Max Pages: {pages}")
-        print("   This may take a while...\n")
+        # إنشاء سياق الفحص
+        context = ScanContext(
+            target=ScanTarget(url=target_url, method="GET")
+        )
         
-        # محاكاة الفحص
-        await asyncio.sleep(2)
+        all_findings = []
         
-        print("✅ Scan completed!")
-        print(f"   Pages crawled: {pages // 2}")
-        print(f"   Forms found: {pages // 10}")
-        print(f"   API endpoints: {pages // 20}")
-        print(f"   Vulnerabilities found: {depth * 2}")
+        # 1. فحص XSS
+        print(f"   {Color.CYAN}📡 Running XSS Scanner...{Color.RESET}")
+        try:
+            xss_scanner = XSSScanner()
+            xss_findings = await xss_scanner.execute_scan(context)
+            all_findings.extend(xss_findings)
+            print(f"      ✓ XSS scan complete: {len(xss_findings)} findings")
+        except Exception as e:
+            print(f"      ❌ XSS scan error: {e}")
+        
+        # 2. فحص SQLi
+        print(f"   {Color.CYAN}💉 Running SQLi Scanner...{Color.RESET}")
+        try:
+            sqli_scanner = SQLiScanner()
+            sqli_findings = await sqli_scanner.execute_scan(context)
+            all_findings.extend(sqli_findings)
+            print(f"      ✓ SQLi scan complete: {len(sqli_findings)} findings")
+        except Exception as e:
+            print(f"      ❌ SQLi scan error: {e}")
+        
+        # 3. فحص IDOR
+        print(f"   {Color.CYAN}🔐 Running IDOR Scanner...{Color.RESET}")
+        try:
+            idor_scanner = IDORScanner()
+            idor_findings = await idor_scanner.execute_scan(context)
+            all_findings.extend(idor_findings)
+            print(f"      ✓ IDOR scan complete: {len(idor_findings)} findings")
+        except Exception as e:
+            print(f"      ❌ IDOR scan error: {e}")
+        
+        # حفظ النتائج
+        scan_id = f"scan_{len(self.scans)+1:03d}"
+        self.scans.append({
+            "id": scan_id,
+            "target": target_url,
+            "status": "completed",
+            "date": datetime.now().strftime("%Y-%m-%d"),
+            "findings_count": len(all_findings),
+            "findings": all_findings
+        })
+        
+        # حفظ الثغرات
+        for finding in all_findings:
+            self.vulnerabilities.append({
+                "type": finding.vulnerability_type,
+                "severity": finding.severity.value,
+                "url": finding.url,
+                "parameter": finding.parameter or "N/A",
+                "payload": finding.payload or "N/A"
+            })
+        
+        print(f"\n{Color.BRIGHT_GREEN}✅ Scan completed!{Color.RESET}")
+        print(f"   Total vulnerabilities found: {len(all_findings)}")
+        
+        for finding in all_findings[:5]:
+            severity_color = Color.RED if finding.severity.value in ["critical", "high"] else Color.YELLOW
+            print(f"   {severity_color}[{finding.severity.value.upper()}]{Color.RESET} {finding.vulnerability_type} - {finding.url}")
     
     async def cmd_attack(self, args: List[str], cli_args):
-        """تنفيذ أمر الهجوم"""
+        """تنفيذ هجوم حقيقي"""
         if len(args) < 2:
             print("Usage: attack <target_url> <vulnerability_type> [--parameter NAME]")
             return
         
         target_url = args[0]
-        vuln_type = args[1]
+        vuln_type = args[1].lower()
         parameter = None
         
         for i, arg in enumerate(args[2:]):
             if arg == "--parameter" and i + 1 < len(args) - 2:
                 parameter = args[i + 3]
         
-        print(f"\n⚔️ Starting {vuln_type} attack on {target_url}")
+        print(f"\n{Color.BRIGHT_CYAN}⚔️ Starting REAL {vuln_type} attack on {target_url}{Color.RESET}")
         if parameter:
             print(f"   Parameter: {parameter}")
         print("   Attempting exploitation...\n")
         
-        await asyncio.sleep(1.5)
-        
-        print("✅ Attack completed!")
-        print(f"   Status: {'SUCCESS' if vuln_type != 'unknown' else 'FAILED'}")
         if vuln_type == "xss":
-            print("   Alert triggered: XSS vulnerability confirmed")
+            scanner = XSSScanner()
+            params = {parameter: "test"} if parameter else {}
+            context = ScanContext(target=ScanTarget(url=target_url, params=params))
+            findings = await scanner.execute_scan(context)
+            
+            if findings:
+                print(f"{Color.BRIGHT_GREEN}✅ Attack completed!{Color.RESET}")
+                print(f"   Status: SUCCESS")
+                print(f"   Vulnerable parameter: {findings[0].parameter}")
+            else:
+                print(f"{Color.RED}❌ Attack failed!{Color.RESET}")
+                print(f"   No XSS vulnerability found")
+        
         elif vuln_type == "sqli":
-            print("   Data extracted: Database version and table names")
-        elif vuln_type == "rce":
-            print("   Command executed: id, whoami")
+            scanner = SQLiScanner()
+            params = {parameter: "1"} if parameter else {}
+            context = ScanContext(target=ScanTarget(url=target_url, params=params))
+            findings = await scanner.execute_scan(context)
+            
+            if findings:
+                print(f"{Color.BRIGHT_GREEN}✅ Attack completed!{Color.RESET}")
+                print(f"   Status: SUCCESS")
+                print(f"   Vulnerable parameter: {findings[0].parameter}")
+            else:
+                print(f"{Color.RED}❌ Attack failed!{Color.RESET}")
+                print(f"   No SQL injection vulnerability found")
+        
+        else:
+            print(f"{Color.YELLOW}⚠ Attack type '{vuln_type}' not fully implemented yet{Color.RESET}")
     
     async def cmd_exploit(self, args: List[str], cli_args):
-        """تنفيذ أمر الاستغلال"""
-        if len(args) < 2:
-            print("Usage: exploit <target_url> <vulnerability_type> [--parameter NAME]")
-            return
-        
-        target_url = args[0]
-        vuln_type = args[1]
-        parameter = None
-        
-        for i, arg in enumerate(args[2:]):
-            if arg == "--parameter" and i + 1 < len(args) - 2:
-                parameter = args[i + 3]
-        
-        print(f"\n🎯 Exploiting {vuln_type} on {target_url}")
-        if parameter:
-            print(f"   Parameter: {parameter}")
-        print("   Extracting sensitive data...\n")
-        
-        await asyncio.sleep(2)
-        
-        print("✅ Exploitation successful!")
-        print("   Extracted data:")
-        print("   - Database: target_db")
-        print("   - Tables: users, products, orders")
-        print("   - Credentials: admin:password123")
+        """استغلال ثغرة"""
+        print(f"\n{Color.YELLOW}⚠ Exploitation module in development{Color.RESET}")
     
     async def cmd_status(self, args: List[str], cli_args):
         """عرض حالة النظام"""
-        print("\n📊 System Status")
+        print(f"\n{Color.BRIGHT_CYAN}📊 System Status{Color.RESET}")
         print("=" * 40)
-        print(f"   Status: {'🟢 Running' if True else '🔴 Stopped'}")
+        print(f"   Status: {Color.BRIGHT_GREEN}🟢 Running{Color.RESET}")
         print(f"   Uptime: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
-        print(f"   Active Scans: 0")
-        print(f"   Completed Scans: 5")
-        print(f"   Vulnerabilities Found: 12")
-        print(f"   Successful Attacks: 3")
+        print(f"   Scans performed: {len(self.scans)}")
+        print(f"   Vulnerabilities found: {len(self.vulnerabilities)}")
         print("")
     
     async def cmd_list(self, args: List[str], cli_args):
@@ -197,97 +239,82 @@ class CLIRunner:
         list_type = args[0].lower()
         
         if list_type == "scans":
-            print("\n📋 Recent Scans")
-            print("=" * 50)
-            print(f"{'ID':<10} {'Target':<30} {'Status':<10} {'Date':<20}")
-            print("-" * 50)
-            print(f"{'scan_001':<10} {'https://example.com':<30} {'completed':<10} {'2024-01-15':<20}")
-            print(f"{'scan_002':<10} {'https://test.com':<30} {'completed':<10} {'2024-01-14':<20}")
+            print(f"\n{Color.BRIGHT_CYAN}📋 Recent Scans{Color.RESET}")
+            print("=" * 80)
+            print(f"{'ID':<12} {'Target':<45} {'Status':<10} {'Findings':<10}")
+            print("-" * 80)
+            for scan in self.scans[-10:]:
+                print(f"{scan['id']:<12} {scan['target'][:44]:<45} {scan['status']:<10} {scan['findings_count']:<10}")
         
         elif list_type == "vulnerabilities":
-            print("\n🔍 Vulnerabilities Found")
-            print("=" * 70)
-            print(f"{'Type':<15} {'Severity':<10} {'URL':<25} {'Parameter':<10}")
-            print("-" * 70)
-            print(f"{'XSS':<15} {'high':<10} {'https://example.com/search':<25} {'q':<10}")
-            print(f"{'SQLi':<15} {'critical':<10} {'https://example.com/product':<25} {'id':<10}")
-        
-        elif list_type == "attacks":
-            print("\n⚔️ Attack History")
-            print("=" * 60)
-            print(f"{'ID':<10} {'Target':<25} {'Type':<10} {'Result':<10}")
-            print("-" * 60)
-            print(f"{'att_001':<10} {'https://example.com':<25} {'XSS':<10} {'success':<10}")
-            print(f"{'att_002':<10} {'https://example.com':<25} {'SQLi':<10} {'success':<10}")
+            print(f"\n{Color.BRIGHT_CYAN}🔍 Vulnerabilities Found{Color.RESET}")
+            print("=" * 80)
+            print(f"{'Type':<15} {'Severity':<10} {'URL':<40} {'Parameter':<15}")
+            print("-" * 80)
+            for vuln in self.vulnerabilities[-20:]:
+                severity_color = Color.RED if vuln['severity'] in ["critical", "high"] else Color.YELLOW
+                print(f"{vuln['type']:<15} {severity_color}{vuln['severity']:<10}{Color.RESET} {vuln['url'][:39]:<40} {vuln['parameter']:<15}")
         
         elif list_type == "agents":
-            print("\n🤖 Active Agents")
+            print(f"\n{Color.BRIGHT_CYAN}🤖 Available Agents{Color.RESET}")
             print("=" * 40)
-            print(f"{'Name':<20} {'Status':<10} {'Tasks':<10}")
-            print("-" * 40)
-            print(f"{'XSSAgent':<20} {'running':<10} {'5':<10}")
-            print(f"{'SQLiAgent':<20} {'idle':<10} {'3':<10}")
-            print(f"{'ReconAgent':<20} {'running':<10} {'2':<10}")
-        
-        else:
-            print(f"Unknown list type: {list_type}")
+            print("   - XSSAgent (XSS Scanner)")
+            print("   - SQLiAgent (SQL Injection Scanner)")
+            print("   - IDORAgent (IDOR Scanner)")
+            print("   - ReconAgent (Reconnaissance)")
+            print("   - WAFAgent (WAF Detector)")
     
     async def cmd_show(self, args: List[str], cli_args):
         """عرض تفاصيل عنصر"""
         if len(args) < 2:
-            print("Usage: show <scan|vulnerability|attack> <id>")
+            print("Usage: show <scan|vulnerability> <id>")
             return
         
         item_type = args[0].lower()
         item_id = args[1]
         
         if item_type == "scan":
-            print(f"\n📄 Scan Details: {item_id}")
-            print("=" * 50)
-            print(f"   Target: https://example.com")
-            print(f"   Status: completed")
-            print(f"   Start Time: 2024-01-15 10:30:00")
-            print(f"   End Time: 2024-01-15 10:35:00")
-            print(f"   Pages Crawled: 45")
-            print(f"   Forms Found: 8")
-            print(f"   API Endpoints: 12")
-            print(f"   Vulnerabilities: 3")
+            for scan in self.scans:
+                if scan['id'] == item_id:
+                    print(f"\n{Color.BRIGHT_CYAN}📄 Scan Details: {item_id}{Color.RESET}")
+                    print("=" * 50)
+                    print(f"   Target: {scan['target']}")
+                    print(f"   Status: {scan['status']}")
+                    print(f"   Date: {scan['date']}")
+                    print(f"   Vulnerabilities: {scan['findings_count']}")
+                    print("")
+                    return
+            
+            print(f"Scan {item_id} not found")
         
         elif item_type == "vulnerability":
-            print(f"\n🔍 Vulnerability Details: {item_id}")
-            print("=" * 50)
-            print(f"   Type: XSS")
-            print(f"   Severity: High")
-            print(f"   URL: https://example.com/search")
-            print(f"   Parameter: q")
-            print(f"   Payload: <script>alert('XSS')</script>")
-            print(f"   Remediation: Use output encoding")
-        
-        elif item_type == "attack":
-            print(f"\n⚔️ Attack Details: {item_id}")
-            print("=" * 50)
-            print(f"   Type: XSS")
-            print(f"   Target: https://example.com/search")
-            print(f"   Status: success")
-            print(f"   Execution Time: 1.2s")
-            print(f"   Output: Alert triggered successfully")
-        
-        else:
-            print(f"Unknown item type: {item_type}")
+            for vuln in self.vulnerabilities:
+                if vuln.get('id') == item_id:
+                    print(f"\n{Color.BRIGHT_CYAN}🔍 Vulnerability Details: {item_id}{Color.RESET}")
+                    print("=" * 50)
+                    print(f"   Type: {vuln['type']}")
+                    print(f"   Severity: {vuln['severity']}")
+                    print(f"   URL: {vuln['url']}")
+                    print(f"   Parameter: {vuln['parameter']}")
+                    print(f"   Payload: {vuln['payload'][:100] if vuln['payload'] else 'N/A'}")
+                    print("")
+                    return
+            
+            print(f"Vulnerability {item_id} not found")
     
     async def cmd_help(self, args: List[str], cli_args):
         """عرض المساعدة"""
-        print("\n📚 Available Commands")
+        print(f"\n{Color.BRIGHT_CYAN}📚 Available Commands{Color.RESET}")
         print("=" * 50)
-        print("  scan <url> [--depth N] [--pages N]   - Start a security scan")
-        print("  attack <url> <type> [--parameter N]  - Launch an attack")
-        print("  exploit <url> <type> [--parameter N] - Exploit a vulnerability")
-        print("  status                              - Show system status")
-        print("  list <scans|vulnerabilities|attacks|agents> - List items")
-        print("  show <scan|vulnerability|attack> <id> - Show details")
-        print("  help                                - Show this help")
-        print("  exit, quit                          - Exit the CLI")
+        print("  scan <url>                         - Start a REAL security scan")
+        print("  attack <url> <type> [--parameter]  - Launch a REAL attack")
+        print("  status                            - Show system status")
+        print("  list <scans|vulnerabilities|agents> - List items")
+        print("  show <scan|vulnerability> <id>     - Show details")
+        print("  help                              - Show this help")
+        print("  exit, quit                        - Exit the CLI")
         print("")
+        print(f"{Color.BRIGHT_GREEN}✅ This CLI is connected to REAL scanners!{Color.RESET}")
     
     async def cmd_exit(self, args: List[str], cli_args):
         """الخروج من CLI"""
@@ -315,4 +342,3 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
-

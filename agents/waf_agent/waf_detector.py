@@ -1,6 +1,6 @@
-
 import re
 import asyncio
+import time
 from typing import Dict, List, Optional, Any, Set, Tuple
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -12,7 +12,6 @@ logger = logging.getLogger(__name__)
 
 @dataclass
 class WAFDetection:
-    """نتيجة كشف WAF"""
     waf_name: str
     confidence: float
     evidence: List[str]
@@ -33,7 +32,6 @@ class WAFDetector:
     - اختبار الاستجابة للتأخير
     """
     
-    # أنماط كشف WAF الموسعة
     WAF_PATTERNS = {
         "Cloudflare": {
             "headers": [
@@ -145,10 +143,34 @@ class WAFDetector:
         }
     }
     
-    def __init__(self):
+    def __init__(self, http_client=None):
+        self._http_client = http_client
         self._detections: Dict[str, WAFDetection] = {}
         
         logger.info("WAFDetector initialized")
+    
+    def set_http_client(self, client):
+        """تعيين عميل HTTP"""
+        self._http_client = client
+    
+    async def _send_request(self, url: str, timeout: float = 30.0) -> tuple:
+        """إرسال طلب HTTP"""
+        if self._http_client and hasattr(self._http_client, 'send_request'):
+            start = time.time()
+            response = await self._http_client.send_request(url, method="GET")
+            elapsed = time.time() - start
+            return response, elapsed, 200 if response else 404
+        
+        try:
+            import httpx
+            start = time.time()
+            async with httpx.AsyncClient(timeout=timeout) as client:
+                response = await client.get(url)
+            elapsed = time.time() - start
+            return response.text, elapsed, response.status_code
+        except Exception as e:
+            logger.debug(f"Request error: {e}")
+            return None, 0, 0
     
     async def detect(
         self,
@@ -158,31 +180,16 @@ class WAFDetector:
         status_code: int,
         target_url: str
     ) -> Optional[WAFDetection]:
-        """
-        كشف WAF من مصادر متعددة
-        
-        Args:
-            headers: هيدرات الاستجابة
-            cookies: كوكيز الاستجابة
-            response_text: نص الاستجابة
-            status_code: كود الحالة
-            target_url: الرابط المستهدف
-        
-        Returns:
-            كائن WAFDetection أو None
-        """
         detections = []
         
         for waf_name, patterns in self.WAF_PATTERNS.items():
             confidence = 0.0
             evidence = []
             
-            # فحص كود الحالة
             if status_code in patterns.get("status_codes", []):
                 confidence += 0.3
                 evidence.append(f"Status code {status_code}")
             
-            # فحص الهيدرات
             for pattern in patterns.get("headers", []):
                 for header, value in headers.items():
                     if re.search(pattern, header, re.I) or re.search(pattern, value, re.I):
@@ -190,7 +197,6 @@ class WAFDetector:
                         evidence.append(f"Header pattern: {pattern}")
                         break
             
-            # فحص الكوكيز
             for pattern in patterns.get("cookies", []):
                 for cookie in cookies:
                     if re.search(pattern, cookie, re.I):
@@ -198,7 +204,6 @@ class WAFDetector:
                         evidence.append(f"Cookie pattern: {pattern}")
                         break
             
-            # فحص الاستجابة
             for pattern in patterns.get("response", []):
                 if re.search(pattern, response_text, re.I):
                     confidence += 0.2
@@ -213,7 +218,6 @@ class WAFDetector:
                 )
                 detections.append(detection)
         
-        # اختيار أعلى ثقة
         if detections:
             best = max(detections, key=lambda x: x.confidence)
             self._detections[target_url] = best
@@ -223,15 +227,6 @@ class WAFDetector:
         return None
     
     async def detect_by_challenge(self, response_text: str) -> Optional[str]:
-        """
-        كشف WAF من خلال صفحة التحدي (Challenge page)
-        
-        Args:
-            response_text: نص الاستجابة
-        
-        Returns:
-            نوع WAF أو None
-        """
         challenge_patterns = {
             "Cloudflare": [
                 r'Checking if the site connection is secure',
@@ -260,38 +255,55 @@ class WAFDetector:
         return None
     
     async def test_delay(self, url: str, timeout: float = 5.0) -> float:
+        response, elapsed, status = await self._send_request(url, timeout)
+        
+        if elapsed > 1.0:
+            logger.debug(f"Response delay detected: {elapsed:.2f}s (possible WAF)")
+        
+        return elapsed
+    
+    async def test_waf_blocking(
+        self,
+        url: str,
+        test_payload: str = "<script>alert('test')</script>"
+    ) -> Dict[str, Any]:
         """
-        اختبار وجود تأخير في الاستجابة (قد يشير إلى WAF)
+        اختبار قدرة WAF على حظر حمولة ضارة
         
         Args:
             url: الرابط للاختبار
-            timeout: مهلة الطلب
+            test_payload: حمولة للاختبار
         
         Returns:
-            وقت الاستجابة بالثواني
+            نتيجة الاختبار
         """
-        import time
-        import httpx
+        # بناء URL مع الحمولة
+        from urllib.parse import urlparse, parse_qs, urlencode, urlunparse
         
-        try:
-            start = time.time()
-            async with httpx.AsyncClient(timeout=timeout) as client:
-                await client.get(url)
-            elapsed = time.time() - start
-            
-            if elapsed > 1.0:
-                logger.debug(f"Response delay detected: {elapsed:.2f}s (possible WAF)")
-            
-            return elapsed
-        except Exception:
-            return 0.0
+        parsed = urlparse(url)
+        params = parse_qs(parsed.query)
+        
+        # إضافة الحمولة إلى معامل
+        params['q'] = [test_payload]
+        new_query = urlencode(params, doseq=True)
+        test_url = urlunparse(parsed._replace(query=new_query))
+        
+        response, elapsed, status = await self._send_request(test_url)
+        
+        result = {
+            "url": test_url,
+            "payload": test_payload,
+            "status_code": status,
+            "blocked": status in [403, 406, 429, 503],
+            "response_time": elapsed
+        }
+        
+        return result
     
     async def get_detection(self, target_url: str) -> Optional[WAFDetection]:
-        """الحصول على نتيجة كشف WAF لهدف معين"""
         return self._detections.get(target_url)
     
     async def get_all_detections(self) -> List[Dict]:
-        """الحصول على جميع نتائج الكشف"""
         return [
             {
                 "url": url,
@@ -304,7 +316,6 @@ class WAFDetector:
         ]
     
     async def get_statistics(self) -> Dict:
-        """إحصائيات الكاشف"""
         waf_counts = {}
         for detection in self._detections.values():
             waf_counts[detection.waf_name] = waf_counts.get(detection.waf_name, 0) + 1
@@ -316,11 +327,14 @@ class WAFDetector:
         }
     
     async def clear_detections(self, target_url: str = None):
-        """مسح نتائج الكشف"""
         if target_url:
             self._detections.pop(target_url, None)
         else:
             self._detections.clear()
         
         logger.info(f"WAF detections cleared for {target_url if target_url else 'all targets'}")
-
+    
+    async def close(self):
+        """إغلاق الموارد"""
+        self._http_client = None
+        logger.info("WAFDetector closed")
