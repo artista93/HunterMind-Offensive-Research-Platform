@@ -1,4 +1,3 @@
-
 import asyncio
 import random
 import json
@@ -35,7 +34,7 @@ class BrowserInstance:
     last_used: datetime = field(default_factory=datetime.now)
     usage_count: int = 0
     error_count: int = 0
-    priority: int = 5  # 1-10, 1 highest
+    priority: int = 5
     metadata: Dict[str, Any] = field(default_factory=dict)
     
     def use(self):
@@ -59,12 +58,28 @@ class BrowserInstance:
         return (datetime.now() - self.created_at).total_seconds()
 
 
+@dataclass
+class BrowserContextInstance:
+    """مثيل سياق المتصفح"""
+    id: str
+    context: BrowserContext
+    browser_id: str
+    created_at: datetime = field(default_factory=datetime.now)
+    pages: list = field(default_factory=list)
+    
+    def add_page(self, page: Page):
+        self.pages.append(page)
+    
+    def remove_page(self, page: Page):
+        if page in self.pages:
+            self.pages.remove(page)
+
+
 class StealthConfig:
     """إعدادات التخفي المتقدمة"""
     
     @staticmethod
     def get_stealth_args() -> List[str]:
-        """الحصول على معاملات التشغيل المتقدمة"""
         return [
             "--no-sandbox",
             "--disable-setuid-sandbox",
@@ -95,7 +110,6 @@ class StealthConfig:
     
     @staticmethod
     def get_random_user_agent() -> str:
-        """User-Agent عشوائي"""
         user_agents = [
             "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120.0.0.0 Safari/537.36",
             "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 Chrome/120.0.0.0 Safari/537.36",
@@ -107,7 +121,6 @@ class StealthConfig:
     
     @staticmethod
     def get_viewport() -> Dict:
-        """أبعاد نافذة عشوائية"""
         viewports = [
             {"width": 1280, "height": 720},
             {"width": 1366, "height": 768},
@@ -119,13 +132,11 @@ class StealthConfig:
     
     @staticmethod
     def get_locale() -> str:
-        """اللغة/المنطقة"""
         locales = ["en-US", "en-GB", "fr-FR", "de-DE", "es-ES", "it-IT"]
         return random.choice(locales)
     
     @staticmethod
     def get_timezone() -> str:
-        """المنطقة الزمنية"""
         timezones = [
             "America/New_York", "America/Los_Angeles", "Europe/London",
             "Europe/Paris", "Asia/Tokyo", "Asia/Dubai", "Australia/Sydney"
@@ -134,15 +145,11 @@ class StealthConfig:
     
     @staticmethod
     def get_permissions() -> List[str]:
-        """صلاحيات المتصفح"""
         permissions = ["geolocation", "notifications", "clipboard-read", "clipboard-write"]
-        # اختيار عشوائي
         return random.sample(permissions, k=random.randint(0, len(permissions)))
 
 
 class AdaptiveRetry:
-    """نظام إعادة محاولة متكيف"""
-    
     def __init__(self, base_delay: float = 0.5, max_delay: float = 30.0, max_retries: int = 5):
         self.base_delay = base_delay
         self.max_delay = max_delay
@@ -150,9 +157,7 @@ class AdaptiveRetry:
         self.jitter = True
     
     async def execute(self, coro, *args, **kwargs) -> Any:
-        """تنفيذ مع إعادة محاولة وتأخير متزايد"""
         last_error = None
-        
         for attempt in range(self.max_retries):
             try:
                 return await coro(*args, **kwargs)
@@ -160,32 +165,24 @@ class AdaptiveRetry:
                 last_error = e
                 if attempt == self.max_retries - 1:
                     raise
-                
-                # تأخير متزايد مع jitter
                 delay = min(self.base_delay * (2 ** attempt), self.max_delay)
                 if self.jitter:
                     delay = delay * (0.5 + random.random())
-                
                 await asyncio.sleep(delay)
-        
         raise last_error
 
 
 class PriorityQueue:
-    """طابور ذو أولوية للمهام"""
-    
     def __init__(self):
         self._queue = []
         self._counter = 0
     
     def put(self, item: Any, priority: int = 5):
-        """إضافة عنصر بأولوية (1 أعلى، 10 أقل)"""
         import heapq
         heapq.heappush(self._queue, (priority, self._counter, item))
         self._counter += 1
     
     def get(self) -> Optional[Any]:
-        """الحصول على العنصر ذو الأولوية الأعلى"""
         import heapq
         if not self._queue:
             return None
@@ -200,8 +197,6 @@ class PriorityQueue:
 
 
 class BrowserPool:
-    """تجمع المتصفحات المتقدم"""
-    
     def __init__(
         self,
         pool_size: int = 3,
@@ -234,28 +229,19 @@ class BrowserPool:
         }
     
     async def initialize(self):
-        """تهيئة تجمع المتصفحات"""
         if self._initialized:
             return
-        
         self.playwright = await async_playwright().start()
-        
-        # إنشاء المتصفحات بالتوازي
         tasks = [self._create_browser() for _ in range(self.pool_size)]
         browsers = await asyncio.gather(*tasks)
         self.browsers = browsers
         self._stats["total_creations"] = self.pool_size
-        
         self._initialized = True
         print(f"   🌐 Browser pool initialized: {self.pool_size} × {self.browser_type.value}")
     
     async def _create_browser(self) -> BrowserInstance:
-        """إنشاء متصفح جديد مع التخفي المتقدم"""
         import uuid
-        
         launch_args = StealthConfig.get_stealth_args() if self.enable_stealth else []
-        
-        # اختيار عشوائي للإعدادات
         user_agent = StealthConfig.get_random_user_agent()
         viewport = StealthConfig.get_viewport()
         locale = StealthConfig.get_locale()
@@ -291,19 +277,13 @@ class BrowserPool:
         )
     
     async def acquire(self, priority: int = 5, timeout: float = 30.0) -> Optional[BrowserInstance]:
-        """
-        الحصول على متصفح من التجمع مع الأولوية والـ timeout
-        priority: 1 (أعلى) إلى 10 (أقل)
-        """
         start_time = time.time()
-        
         async with self._lock:
             if not self._initialized:
                 await self.initialize()
         
         while time.time() - start_time < timeout:
             async with self._lock:
-                # البحث عن متصفح خامل
                 for browser in sorted(self.browsers, key=lambda b: b.priority):
                     if browser.status == BrowserStatus.IDLE and browser.is_healthy():
                         if browser.age_seconds() > self.max_age_seconds:
@@ -315,11 +295,8 @@ class BrowserPool:
                             self._stats["avg_wait_time"] * 0.9 + (time.time() - start_time) * 0.1
                         )
                         return browser
-            
-            # لا يوجد متصفح متاح، انتظر مع backoff
             await asyncio.sleep(0.1 * (self._stats["total_reuses"] % 10 + 1))
         
-        # إنشاء متصفح جديد مؤقت
         async with self._lock:
             temp_browser = await self._create_browser()
             temp_browser.use()
@@ -332,16 +309,13 @@ class BrowserPool:
             return temp_browser
     
     async def release(self, browser_instance: BrowserInstance):
-        """تحرير المتصفح"""
         async with self._lock:
             browser_instance.release()
     
     async def _recycle_browser(self, browser_instance: BrowserInstance):
-        """إعادة تدوير متصفح قديم"""
         try:
             await browser_instance.browser.close()
             self._stats["total_closures"] += 1
-            
             new_browser = await self._create_browser()
             index = self.browsers.index(browser_instance)
             self.browsers[index] = new_browser
@@ -351,9 +325,7 @@ class BrowserPool:
             self._stats["total_errors"] += 1
     
     async def create_context(self, browser_instance: BrowserInstance) -> BrowserContextInstance:
-        """إنشاء سياق جديد مع إعدادات التخفي"""
         import uuid
-        
         metadata = browser_instance.metadata
         
         context = await browser_instance.browser.new_context(
@@ -380,7 +352,6 @@ class BrowserPool:
         return context_instance
     
     async def close_context(self, context_instance: BrowserContextInstance):
-        """إغلاق سياق"""
         try:
             await context_instance.context.close()
         except Exception:
@@ -390,11 +361,11 @@ class BrowserPool:
                 del self.contexts[context_instance.id]
     
     async def create_page(self, context_instance: BrowserContextInstance) -> Page:
-        """إنشاء صفحة جديدة"""
-        return await context_instance.context.new_page()
+        page = await context_instance.context.new_page()
+        context_instance.add_page(page)
+        return page
     
     async def navigate(self, page: Page, url: str, timeout: int = 30000) -> bool:
-        """التنقل إلى URL مع إعادة محاولة"""
         try:
             await self.retry.execute(
                 page.goto,
@@ -407,7 +378,6 @@ class BrowserPool:
             return False
     
     async def close_all(self):
-        """إغلاق جميع المتصفحات"""
         for browser in self.browsers:
             try:
                 await browser.browser.close()
@@ -430,7 +400,6 @@ class BrowserPool:
         print("   🔒 Browser pool closed")
     
     def get_stats(self) -> Dict:
-        """إحصائيات التجمع"""
         return {
             "pool_size": len(self.browsers),
             "available": sum(1 for b in self.browsers if b.status == BrowserStatus.IDLE),
@@ -444,7 +413,6 @@ class BrowserPool:
         }
     
     async def health_check(self) -> bool:
-        """فحص صحة التجمع"""
         try:
             browser = await self.acquire(timeout=5.0)
             if browser:
@@ -455,7 +423,6 @@ class BrowserPool:
         return False
 
 
-# نسخة عالمية
 _default_pool = None
 
 
@@ -480,4 +447,3 @@ async def close_browser_pool():
     if _default_pool:
         await _default_pool.close_all()
         _default_pool = None
-

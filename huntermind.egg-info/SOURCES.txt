@@ -162,6 +162,7 @@ interfaces/api/grpc_server.py
 interfaces/api/websocket_api.py
 interfaces/cli/__init__.py
 interfaces/cli/cli_runner.py
+interfaces/cli/cli_runner_real.py
 interfaces/cli/command_parser.py
 interfaces/cli/terminal_ui.py
 interfaces/dashboard/__init__.py

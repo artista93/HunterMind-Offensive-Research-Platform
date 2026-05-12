@@ -6,9 +6,9 @@ from datetime import datetime
 
 from ..base.base_agent import BaseAgent, AgentPriority, AgentMessage
 from ..base.agent_state import AgentStateEnum
-from ...offensive.scanners.auth_scanner import AuthScanner, Finding, Severity, Confidence
-from ...offensive.scanners.base_scanner import ScanContext, ScanTarget
-from ...offensive.exploitation.exploit_memory import get_exploit_memory
+from offensive.scanners.auth_scanner import AuthScanner, Finding, Severity, Confidence
+from offensive.scanners.base_scanner import ScanContext, ScanTarget
+from offensive.exploitation.exploit_memory import get_exploit_memory
 
 import logging
 

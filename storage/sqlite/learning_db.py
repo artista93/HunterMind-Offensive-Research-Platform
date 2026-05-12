@@ -1,4 +1,3 @@
-
 import sqlite3
 import json
 import asyncio
@@ -33,6 +32,7 @@ try:
     FAISS_AVAILABLE = True
 except ImportError:
     FAISS_AVAILABLE = False
+    logger = logging.getLogger(__name__)
     logger.warning("FAISS not available, embedding search will be O(N)")
 
 logger = logging.getLogger(__name__)
@@ -701,6 +701,56 @@ class LearningDatabase:
         
         return stats
     
+    async def store_experience(
+        self,
+        agent_name: str,
+        state: Dict[str, Any],
+        action: str,
+        reward: float,
+        next_state: Dict[str, Any],
+        done: bool,
+        metadata: Dict = None
+    ) -> int:
+        """
+        تخزين تجربة تعلم (متوافق مع LearningAgent)
+        
+        Args:
+            agent_name: اسم الوكيل
+            state: الحالة الحالية
+            action: الإجراء المتخذ
+            reward: المكافأة
+            next_state: الحالة التالية
+            done: هل انتهت الحلقة؟
+            metadata: بيانات إضافية
+        
+        Returns:
+            معرف التجربة
+        """
+        # تحويل action إلى int
+        action_int = 0
+        if isinstance(action, str):
+            action_map = {"inject_payload": 0, "scan": 1, "report": 2, "default_action": 0}
+            action_int = action_map.get(action, 0)
+        else:
+            action_int = action
+        
+        # إنشاء RLTransition
+        transition = RLTransition(
+            id=None,
+            state=[0.5] * 50,  # تبسيط للمتجه
+            action=action_int,
+            reward=reward,
+            next_state=[0.5] * 50,  # تبسيط للمتجه
+            done=done,
+            agent_name=agent_name,
+            priority=1.0,
+            td_error=0.0,
+            episode_id=None,
+            created_at=datetime.now()
+        )
+        
+        return await self.store_rl_transition(transition)
+    
     async def close(self):
         """إغلاق قاعدة البيانات"""
         await self._pool.close()
@@ -716,4 +766,3 @@ async def get_learning_database() -> LearningDatabase:
     if _default_db is None:
         _default_db = LearningDatabase()
     return _default_db
-

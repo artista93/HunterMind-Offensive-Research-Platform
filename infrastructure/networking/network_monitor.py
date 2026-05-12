@@ -27,7 +27,7 @@ class RequestStatus(Enum):
 
 
 @dataclass
- class NetworkRequest:
+class NetworkRequest:
     """طلب شبكة"""
     id: str
     url: str

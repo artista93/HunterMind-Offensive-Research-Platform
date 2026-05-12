@@ -1,6 +1,5 @@
-
 from enum import Enum
-from typing import List, Dict, Any, Optional, Union
+from typing import List, Dict, Any, Optional
 from dataclasses import dataclass, field
 from datetime import datetime
 from .world_state import WorldState
@@ -8,16 +7,14 @@ from .vulnerability import Vulnerability
 
 
 class DecisionType(Enum):
-    """أنواع القرارات"""
-    STRATEGIC = "strategic"      # قرار استراتيجي (طويل المدى)
-    TACTICAL = "tactical"        # قرار تكتيكي (قصير المدى)
-    EXECUTION = "execution"      # قرار تنفيذي (فوري)
-    ADAPTIVE = "adaptive"        # قرار تكيفي (رد فعل)
-    EMERGENCY = "emergency"      # قرار طارئ
+    STRATEGIC = "strategic"
+    TACTICAL = "tactical"
+    EXECUTION = "execution"
+    ADAPTIVE = "adaptive"
+    EMERGENCY = "emergency"
 
 
 class DecisionSource(Enum):
-    """مصدر القرار"""
     COGNITIVE_CORE = "cognitive_core"
     STRATEGIC_PLANNER = "strategic_planner"
     TACTICAL_PLANNER = "tactical_planner"
@@ -30,16 +27,14 @@ class DecisionSource(Enum):
 
 
 class DecisionPriority(Enum):
-    """أولوية القرار"""
-    CRITICAL = 1   # حرج - يجب التنفيذ فوراً
-    HIGH = 2       # عالي
-    NORMAL = 3     # عادي
-    LOW = 4        # منخفض
-    BACKGROUND = 5 # خلفية
+    CRITICAL = 1
+    HIGH = 2
+    NORMAL = 3
+    LOW = 4
+    BACKGROUND = 5
 
 
 class DecisionStatus(Enum):
-    """حالة القرار"""
     PENDING = "pending"
     APPROVED = "approved"
     EXECUTING = "executing"
@@ -50,21 +45,25 @@ class DecisionStatus(Enum):
 
 
 class ExecutionStrategy(Enum):
-    """استراتيجية التنفيذ"""
-    IMMEDIATE = "immediate"      # تنفيذ فوري
-    SCHEDULED = "scheduled"      # مجدول
-    CONDITIONAL = "conditional"  # مشروط
-    BATCH = "batch"              # دفعة
-    DEFERRED = "deferred"        # مؤجل
+    IMMEDIATE = "immediate"
+    SCHEDULED = "scheduled"
+    CONDITIONAL = "conditional"
+    BATCH = "batch"
+    DEFERRED = "deferred"
+
+
+def _generate_id() -> str:
+    """توليد ID فريد للقرار (دالة مساعدة لتجنب تكرار الكود)"""
+    import uuid
+    return f"DEC-{uuid.uuid4().hex[:8].upper()}"
 
 
 @dataclass
 class DecisionConfidence:
-    """ثقة القرار"""
-    score: float = 0.0           # 0-1
-    based_on: List[str] = field(default_factory=list)  # مصادر الثقة
-    uncertainty: float = 0.0     # درجة عدم اليقين
-    alternatives: List[str] = field(default_factory=list)  # بدائل محتملة
+    score: float = 0.0
+    based_on: List[str] = field(default_factory=list)
+    uncertainty: float = 0.0
+    alternatives: List[str] = field(default_factory=list)
     
     def is_confident(self) -> bool:
         return self.score >= 0.7
@@ -75,22 +74,19 @@ class DecisionConfidence:
 
 @dataclass
 class DecisionImpact:
-    """تأثير القرار المتوقع"""
-    risk_delta: float = 0.0       # تغير في المخاطر (-1 إلى 1)
-    reward_delta: float = 0.0     # تغير في المكافأة
-    cost_estimate: float = 0.0    # التكلفة المتوقعة
-    time_estimate: float = 0.0    # الوقت المتوقع (ثواني)
-    detection_risk: float = 0.0   # خطر الاكتشاف
+    risk_delta: float = 0.0
+    reward_delta: float = 0.0
+    cost_estimate: float = 0.0
+    time_estimate: float = 0.0
+    detection_risk: float = 0.0
     
     @property
     def net_value(self) -> float:
-        """صافي القيمة (reward - risk - cost)"""
         return self.reward_delta - abs(self.risk_delta) - self.cost_estimate
 
 
 @dataclass
 class DecisionContext:
-    """سياق القرار"""
     world_state: Optional[WorldState] = None
     current_phase: str = ""
     current_goal: str = ""
@@ -102,76 +98,69 @@ class DecisionContext:
 
 @dataclass
 class Decision:
-    """قرار يتخذه النظام"""
+    """
+    قرار يتخذه النظام
     
-    # معلومات أساسية
+    ✅ جميع الحقول المطلوبة (بدون قيم افتراضية) تأتي أولاً
+    ✅ ثم الحقول الاختيارية (بقيم افتراضية)
+    """
+    
+    # ===== الحقول المطلوبة (required) =====
     id: str
-    type: DecisionType
+    decision_type: DecisionType      # تم تغيير الاسم من 'type' لتجنب التعارض
     source: DecisionSource
-    timestamp: datetime = field(default_factory=datetime.now)
-    
-    # محتوى القرار
     action: str
+    
+    # ===== الحقول الاختيارية (optional) =====
     target: Any = None
     parameters: Dict[str, Any] = field(default_factory=dict)
-    
-    # الأولوية والاستراتيجية
     priority: DecisionPriority = DecisionPriority.NORMAL
     strategy: ExecutionStrategy = ExecutionStrategy.IMMEDIATE
     scheduled_time: Optional[datetime] = None
-    
-    # الثقة والتأثير
+    timestamp: datetime = field(default_factory=datetime.now)
     confidence: DecisionConfidence = field(default_factory=DecisionConfidence)
     impact: DecisionImpact = field(default_factory=DecisionImpact)
-    
-    # الأسباب
     reasoning: str = ""
     evidence: List[str] = field(default_factory=list)
-    
-    # الحالة
     status: DecisionStatus = DecisionStatus.PENDING
     result: Any = None
     error: Optional[str] = None
-    
-    # ميتاداتا
     metadata: Dict[str, Any] = field(default_factory=dict)
     
-    def approve(self):
-        """الموافقة على القرار"""
+    # ===== Fluent Interface Methods (return self) =====
+    def approve(self) -> 'Decision':
         self.status = DecisionStatus.APPROVED
+        return self
     
-    def reject(self, reason: str = ""):
-        """رفض القرار"""
+    def reject(self, reason: str = "") -> 'Decision':
         self.status = DecisionStatus.REJECTED
         self.error = reason
+        return self
     
-    def execute(self):
-        """بدء تنفيذ القرار"""
+    def execute(self) -> 'Decision':
         self.status = DecisionStatus.EXECUTING
+        return self
     
-    def complete(self, result: Any = None):
-        """إكمال القرار بنجاح"""
+    def complete(self, result: Any = None) -> 'Decision':
         self.status = DecisionStatus.COMPLETED
         self.result = result
+        return self
     
-    def fail(self, error: str):
-        """فشل القرار"""
+    def fail(self, error: str) -> 'Decision':
         self.status = DecisionStatus.FAILED
         self.error = error
+        return self
     
     def is_executable(self) -> bool:
-        """هل القرار قابل للتنفيذ؟"""
         return self.status == DecisionStatus.APPROVED
     
     def is_done(self) -> bool:
-        """هل انتهى القرار؟"""
         return self.status in [DecisionStatus.COMPLETED, DecisionStatus.FAILED, DecisionStatus.CANCELLED]
     
     def to_dict(self) -> Dict[str, Any]:
-        """تحويل إلى قاموس"""
         return {
             "id": self.id,
-            "type": self.type.value,
+            "type": self.decision_type.value,
             "source": self.source.value,
             "timestamp": self.timestamp.isoformat(),
             "action": self.action,
@@ -185,11 +174,21 @@ class Decision:
             "status": self.status.value,
             "error": self.error
         }
+    
+    @classmethod
+    def create(cls, decision_type: DecisionType, source: DecisionSource, action: str, **kwargs) -> 'Decision':
+        """طريقة مصنع لإنشاء قرارات بشكل آمن"""
+        return cls(
+            id=_generate_id(),
+            decision_type=decision_type,
+            source=source,
+            action=action,
+            **kwargs
+        )
 
 
 @dataclass
 class DecisionProposal:
-    """اقتراح قرار (من مكون قبل التصويت)"""
     source: DecisionSource
     decision: Decision
     weight: float = 1.0
@@ -198,11 +197,10 @@ class DecisionProposal:
 
 @dataclass
 class FusedDecision:
-    """قرار مدمج من مصادر متعددة"""
     original_decisions: List[Decision]
     fused_action: str
     fused_confidence: float
-    consensus_level: float  # نسبة الاتفاق بين المصادر
+    consensus_level: float
     reasoning: str
     conflicts: List[str] = field(default_factory=list)
     
@@ -217,17 +215,13 @@ class FusedDecision:
         }
 
 
-# أنواع القرارات الشائعة
 class CommonDecisions:
-    """قرارات شائعة الاستخدام"""
+    """قرارات شائعة الاستخدام - تستخدم طريقة المصنع لتجنب تكرار الكود"""
     
     @staticmethod
     def create_scan_decision(target_url: str, parameters: Dict = None) -> Decision:
-        """قرار بدء المسح"""
-        import uuid
-        return Decision(
-            id=f"DEC-{uuid.uuid4().hex[:8].upper()}",
-            type=DecisionType.STRATEGIC,
+        return Decision.create(
+            decision_type=DecisionType.STRATEGIC,
             source=DecisionSource.COGNITIVE_CORE,
             action="start_scan",
             target=target_url,
@@ -238,11 +232,8 @@ class CommonDecisions:
     
     @staticmethod
     def create_exploit_decision(vulnerability: Vulnerability) -> Decision:
-        """قرار استغلال ثغرة"""
-        import uuid
-        return Decision(
-            id=f"DEC-{uuid.uuid4().hex[:8].upper()}",
-            type=DecisionType.TACTICAL,
+        return Decision.create(
+            decision_type=DecisionType.TACTICAL,
             source=DecisionSource.AGENT,
             action="exploit",
             target=vulnerability.url,
@@ -257,39 +248,28 @@ class CommonDecisions:
     
     @staticmethod
     def create_adapt_decision(current_strategy: str, reason: str) -> Decision:
-        """قرار تكييف الاستراتيجية"""
-        import uuid
-        return Decision(
-            id=f"DEC-{uuid.uuid4().hex[:8].upper()}",
-            type=DecisionType.ADAPTIVE,
+        new_strategy = "stealth" if "detected" in reason else "aggressive"
+        return Decision.create(
+            decision_type=DecisionType.ADAPTIVE,
             source=DecisionSource.META_LEARNER,
             action="adapt_strategy",
             target=current_strategy,
-            parameters={"new_strategy": "stealth" if "detected" in reason else "aggressive"},
+            parameters={"new_strategy": new_strategy},
             priority=DecisionPriority.NORMAL,
             reasoning=reason
         )
     
     @staticmethod
     def create_emergency_stop_decision(reason: str) -> Decision:
-        """قرار إيقاف طارئ"""
-        import uuid
-        return Decision(
-            id=f"DEC-{uuid.uuid4().hex[:8].upper()}",
-            type=DecisionType.EMERGENCY,
+        return Decision.create(
+            decision_type=DecisionType.EMERGENCY,
             source=DecisionSource.EMERGENCY,
             action="emergency_stop",
-            target=None,
-            parameters={"reason": reason},
             priority=DecisionPriority.CRITICAL,
             strategy=ExecutionStrategy.IMMEDIATE,
             reasoning=reason
         )
 
 
-# دالة مساعدة لتوليد ID فريد
 def generate_decision_id() -> str:
-    """توليد ID فريد للقرار"""
-    import uuid
-    return f"DEC-{uuid.uuid4().hex[:8].upper()}"
-
+    return _generate_id()

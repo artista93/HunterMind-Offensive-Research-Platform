@@ -1,4 +1,3 @@
-
 import sys
 import time
 from typing import Dict, List, Optional, Any, Callable
@@ -315,4 +314,3 @@ def get_terminal_ui() -> TerminalUI:
     if _default_ui is None:
         _default_ui = TerminalUI()
     return _default_ui
-

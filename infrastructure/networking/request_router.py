@@ -244,7 +244,7 @@ class RequestRouter:
             
             return target
     
-    def record_result(self, target_id: str, success: bool, response_time: float = 0.0):
+    async def record_result(self, target_id: str, success: bool, response_time: float = 0.0):
         async with self._lock:
             target = self._targets_by_id.get(target_id)
             if not target:
