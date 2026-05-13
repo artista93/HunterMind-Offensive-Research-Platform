@@ -4,7 +4,7 @@ from typing import Dict, List, Optional, Any, Set, Tuple
 from dataclasses import dataclass, field
 from datetime import datetime
 
-from ...offensive.scanners.base_scanner import Severity
+from offensive.scanners.base_scanner import Severity
 
 import logging
 

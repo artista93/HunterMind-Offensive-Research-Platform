@@ -7,7 +7,7 @@ from datetime import datetime
 from enum import Enum
 from urllib.parse import urlparse, parse_qs, urlencode, urlunparse
 
-from ...offensive.scanners.xss_scanner import Finding, Severity, Confidence
+from offensive.scanners.xss_scanner import Finding, Severity, Confidence
 
 try:
     from playwright.async_api import async_playwright, Page
