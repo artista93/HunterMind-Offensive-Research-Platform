@@ -6,7 +6,7 @@ from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from collections import defaultdict
 
-from ...storage.sqlite.learning_db import get_learning_database
+from storage.sqlite.learning_db import get_learning_database
 
 import logging
 

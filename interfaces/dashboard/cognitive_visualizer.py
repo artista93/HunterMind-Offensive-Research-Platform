@@ -1,4 +1,4 @@
-
+import asyncio
 import json
 from typing import Dict, List, Any, Optional
 from datetime import datetime
@@ -452,24 +452,20 @@ html_template = '''<!DOCTYPE html>
         }
         
         function updateUI(state) {
-            // تحديث الحالة الحالية
             const stateSpan = document.getElementById('currentState');
             const stateIndicator = document.querySelector('#stateDisplay .state-indicator');
             
             stateSpan.textContent = state.current_state;
             stateIndicator.className = `state-indicator state-${state.current_state}`;
             
-            // تحديث دورة التفكير
             document.getElementById('thinkingCycle').textContent = `Cycle: ${state.thinking_cycle || 0}`;
             
-            // تحديث الذاكرة
             if (state.memory_usage) {
                 document.getElementById('workingMemoryFill').style.width = `${state.memory_usage.working * 100}%`;
                 document.getElementById('episodicMemoryFill').style.width = `${state.memory_usage.episodic * 100}%`;
                 document.getElementById('semanticMemoryFill').style.width = `${state.memory_usage.semantic * 100}%`;
             }
             
-            // تحديث الوكلاء النشطين
             const agentsList = document.getElementById('agentsList');
             if (state.active_agents && state.active_agents.length > 0) {
                 agentsList.innerHTML = state.active_agents.map(agent => 
@@ -483,7 +479,6 @@ html_template = '''<!DOCTYPE html>
         function addReasoningStep(step) {
             const reasoningChain = document.getElementById('reasoningChain');
             
-            // إزالة رسالة "لا توجد خطوات" إذا كانت موجودة
             if (reasoningChain.innerHTML.includes('No reasoning steps yet')) {
                 reasoningChain.innerHTML = '';
             }
@@ -497,7 +492,6 @@ html_template = '''<!DOCTYPE html>
             
             reasoningChain.insertBefore(stepDiv, reasoningChain.firstChild);
             
-            // الحفاظ على آخر 20 خطوة فقط
             while (reasoningChain.children.length > 20) {
                 reasoningChain.removeChild(reasoningChain.lastChild);
             }
@@ -513,10 +507,8 @@ html_template = '''<!DOCTYPE html>
             `;
         }
         
-        // بدء الاتصال
         connect();
         
-        // تحديث دوري (كل 5 ثوان)
         setInterval(() => {
             if (ws && ws.readyState === WebSocket.OPEN) {
                 ws.send(JSON.stringify({ type: 'ping' }));
@@ -527,9 +519,6 @@ html_template = '''<!DOCTYPE html>
 </html>'''
 
 
-import asyncio
-
 # تشغيل الخادم
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=5003)
-

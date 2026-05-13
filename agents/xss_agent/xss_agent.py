@@ -5,13 +5,13 @@ from datetime import datetime
 
 from ..base.base_agent import BaseAgent, AgentPriority, AgentMessage
 from ..base.agent_state import AgentStateEnum
-from ...offensive.scanners.xss_scanner import XSSScanner, Finding, Severity, Confidence
-from ...offensive.scanners.base_scanner import ScanContext, ScanTarget
-from ...offensive.payloads.payload_generator import get_payload_generator, PayloadType
-from ...offensive.payloads.payload_encoder import get_payload_encoder
-from ...offensive.payloads.payload_ranker import get_payload_ranker
-from ...offensive.exploitation.exploit_orchestrator import ExploitTarget, get_exploit_orchestrator
-from ...offensive.exploitation.exploit_memory import get_exploit_memory
+from offensive.scanners.xss_scanner import XSSScanner, Finding, Severity, Confidence
+from offensive.scanners.base_scanner import ScanContext, ScanTarget
+from offensive.payloads.payload_generator import get_payload_generator, PayloadType
+from offensive.payloads.payload_encoder import get_payload_encoder
+from offensive.payloads.payload_ranker import get_payload_ranker
+from offensive.exploitation.exploit_orchestrator import ExploitTarget, get_exploit_orchestrator
+from offensive.exploitation.exploit_memory import get_exploit_memory
 
 import logging
 

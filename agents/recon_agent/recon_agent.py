@@ -5,11 +5,11 @@ from datetime import datetime
 
 from ..base.base_agent import BaseAgent, AgentPriority, AgentMessage
 from ..base.agent_state import AgentStateEnum
-from ...offensive.recon.attack_surface_mapper import AttackSurfaceMapper, AttackSurface
-from ...offensive.recon.js_processor import JSProcessor
-from ...offensive.recon.form_extractor import FormExtractor
-from ...offensive.recon.api_collector import APICollector
-from ...offensive.recon.enhanced_crawler import CrawlResult
+from offensive.recon.attack_surface_mapper import AttackSurfaceMapper, AttackSurface
+from offensive.recon.js_processor import JSProcessor
+from offensive.recon.form_extractor import FormExtractor
+from offensive.recon.api_collector import APICollector
+from offensive.recon.enhanced_crawler import CrawlResult
 
 import logging
 
