@@ -4,6 +4,9 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
 
+# استيراد Event Bus
+from orchestration.messaging.event_bus import EventBus, Event, EventType
+
 import logging
 
 logger = logging.getLogger(__name__)
@@ -32,6 +35,13 @@ class WorkflowStep:
 class Orchestrator:
     """
     المنسق الرئيسي المتقدم - يدير جميع مكونات المنصة
+    
+    المسؤوليات:
+    - تنسيق عمليات الفحص والهجوم
+    - إدارة سير العمل
+    - نشر الأحداث عبر Event Bus
+    - التواصل مع جميع المكونات
+    - تسجيل النتائج
     """
     
     def __init__(self):
@@ -41,6 +51,9 @@ class Orchestrator:
         self.active_workflows: Set[str] = set()
         self._lock = asyncio.Lock()
         
+        # Event Bus
+        self._event_bus: Optional[EventBus] = None
+        
         # تخزين النتائج
         self._scans: List[Dict] = []
         self._vulnerabilities: List[Dict] = []
@@ -48,20 +61,51 @@ class Orchestrator:
         
         logger.info("Orchestrator initialized")
     
+    async def _ensure_event_bus(self):
+        """تأكد من وجود Event Bus"""
+        if self._event_bus is None:
+            from orchestration.messaging.event_bus import get_event_bus
+            self._event_bus = await get_event_bus()
+    
+    async def _publish_event(self, event_type: EventType, source: str, data: Any):
+        """نشر حدث عبر Event Bus"""
+        await self._ensure_event_bus()
+        event = Event(type=event_type, source=source, data=data)
+        await self._event_bus.publish(event)
+        logger.debug(f"Event published: {event_type.value} from {source}")
+    
     async def register_component(self, name: str, component: Any):
         async with self._lock:
             self.components[name] = component
+            await self._publish_event(
+                EventType.COMPONENT_LOAD,
+                "orchestrator",
+                {"component_name": name, "status": "registered"}
+            )
             logger.info(f"Component registered: {name}")
     
     async def start(self):
         self.state = OrchestratorState.RUNNING
+        await self._publish_event(
+            EventType.SYSTEM_START,
+            "orchestrator",
+            {"state": self.state.value}
+        )
         logger.info("Orchestrator started")
     
     async def stop(self):
         self.state = OrchestratorState.STOPPING
+        
+        # إلغاء جميع سير العمل النشطة
         for workflow_id in self.active_workflows:
             await self.cancel_workflow(workflow_id)
+        
         self.state = OrchestratorState.STOPPED
+        await self._publish_event(
+            EventType.SYSTEM_STOP,
+            "orchestrator",
+            {"state": self.state.value}
+        )
         logger.info("Orchestrator stopped")
     
     async def create_workflow(self, name: str, steps: List[WorkflowStep]) -> str:
@@ -105,26 +149,31 @@ class Orchestrator:
         self.active_workflows.discard(workflow_id)
         return results
     
-    # ==================== الدوال الجديدة المطلوبة ====================
+    # ==================== الدوال الأساسية المطلوبة ====================
     
     async def execute_full_scan(self, url: str, depth: int = 3, max_pages: int = 50) -> Dict:
         """
         فحص شامل للموقع (زحف + فحص جميع الصفحات)
-        
-        Args:
-            url: رابط الموقع
-            depth: عمق الزحف
-            max_pages: الحد الأقصى للصفحات
-        
-        Returns:
-            نتائج الفحص
         """
         logger.info(f"Starting full scan on {url} (depth={depth}, max_pages={max_pages})")
+        
+        # نشر حدث بدء الفحص
+        scan_id = f"scan_{len(self._scans)+1:03d}"
+        await self._publish_event(
+            EventType.TASK_START,
+            "orchestrator",
+            {"scan_id": scan_id, "target": url, "type": "full_scan"}
+        )
         
         # ========== 1. الزحف ==========
         crawl_result = await self._execute_crawl(url, depth, max_pages)
         
         if not crawl_result.get("pages"):
+            await self._publish_event(
+                EventType.TASK_FAIL,
+                "orchestrator",
+                {"scan_id": scan_id, "error": "No pages discovered"}
+            )
             return {
                 "pages_scanned": 0,
                 "total_findings": 0,
@@ -140,10 +189,18 @@ class Orchestrator:
             logger.info(f"Scanning [{i}/{min(len(pages), max_pages)}]: {page_url[:80]}")
             
             page_findings = await self._scan_page(page_url)
+            
+            # نشر حدث لكل ثغرة مكتشفة
+            for finding in page_findings:
+                await self._publish_event(
+                    EventType.DATA_VULNERABILITY,
+                    "orchestrator",
+                    finding
+                )
+            
             all_findings.extend(page_findings)
         
         # ========== 3. حفظ النتائج ==========
-        scan_id = f"scan_{len(self._scans)+1:03d}"
         scan_result = {
             "id": scan_id,
             "target": url,
@@ -163,6 +220,18 @@ class Orchestrator:
                 "parameter": f.get("parameter", "N/A"),
                 "payload": f.get("payload", "N/A")
             })
+        
+        # نشر حدث اكتمال الفحص
+        await self._publish_event(
+            EventType.TASK_COMPLETE,
+            "orchestrator",
+            {
+                "scan_id": scan_id,
+                "target": url,
+                "findings_count": len(all_findings),
+                "pages_scanned": scan_result["pages_scanned"]
+            }
+        )
         
         return {
             "pages_scanned": scan_result["pages_scanned"],
@@ -259,7 +328,20 @@ class Orchestrator:
     
     async def execute_crawl(self, url: str, depth: int = 3, max_pages: int = 100) -> Dict:
         """زحف الموقع فقط"""
+        await self._publish_event(
+            EventType.TASK_START,
+            "orchestrator",
+            {"target": url, "type": "crawl"}
+        )
+        
         result = await self._execute_crawl(url, depth, max_pages)
+        
+        await self._publish_event(
+            EventType.TASK_COMPLETE,
+            "orchestrator",
+            {"target": url, "pages_found": result.get("total_pages", 0)}
+        )
+        
         return {
             "total_pages": result.get("total_pages", 0),
             "total_forms": result.get("total_forms", 0),
@@ -269,6 +351,14 @@ class Orchestrator:
     
     async def register_account(self, url: str, username: str = None, password: str = None) -> Dict:
         """تسجيل حساب جديد"""
+        logger.info(f"Registering account on {url}")
+        
+        await self._publish_event(
+            EventType.DATA_RECEIVED,
+            "orchestrator",
+            {"action": "register", "url": url}
+        )
+        
         try:
             from agents.auth_agent.registration_agent import get_registration_agent
             
@@ -288,6 +378,13 @@ class Orchestrator:
                     "url": url,
                     "created_at": datetime.now().isoformat()
                 })
+                
+                await self._publish_event(
+                    EventType.DATA_SENT,
+                    "orchestrator",
+                    {"action": "register_success", "username": result.username}
+                )
+                
                 return {
                     "success": True,
                     "username": result.username,
@@ -296,15 +393,29 @@ class Orchestrator:
                     "message": result.message
                 }
             else:
+                await self._publish_event(
+                    EventType.TASK_FAIL,
+                    "orchestrator",
+                    {"action": "register", "error": result.message}
+                )
                 return {"success": False, "message": result.message}
                 
         except Exception as e:
             logger.error(f"Registration failed: {e}")
+            await self._publish_event(
+                EventType.TASK_FAIL,
+                "orchestrator",
+                {"action": "register", "error": str(e)}
+            )
             return {"success": False, "message": str(e)}
     
     async def login(self, username: str, password: str) -> Dict:
         """تسجيل الدخول (محاكاة - لتطوير لاحق)"""
-        # يتم تطوير هذه الدالة لاحقاً
+        await self._publish_event(
+            EventType.DATA_RECEIVED,
+            "orchestrator",
+            {"action": "login", "username": username}
+        )
         return {"success": True, "message": "Session saved"}
     
     async def full_automation(self, register_url: str, target_url: str) -> Dict:
@@ -325,6 +436,8 @@ class Orchestrator:
             "total_findings": scan_result.get("total_findings", 0),
             "scan_id": scan_result.get("scan_id")
         }
+    
+    # ==================== دوال إدارة الحالة ====================
     
     async def get_status(self) -> Dict:
         return {
@@ -370,9 +483,13 @@ class Orchestrator:
         return False
     
     async def _execute_step(self, step: WorkflowStep) -> Any:
-        """تنفيذ خطوة واحدة (محاكاة)"""
+        """تنفيذ خطوة واحدة"""
         if step.action == "scan":
-            return {"scanned": True, "results": []}
+            return await self.execute_full_scan(step.result if step.result else "https://example.com")
+        elif step.action == "crawl":
+            return await self.execute_crawl(step.result if step.result else "https://example.com")
+        elif step.action == "register":
+            return await self.register_account(step.result if step.result else "https://example.com")
         elif step.action == "analyze":
             return {"analyzed": True, "findings": []}
         elif step.action == "exploit":
@@ -381,6 +498,7 @@ class Orchestrator:
             return {"executed": True}
 
 
+# نسخة عالمية
 _default_orchestrator = None
 
 

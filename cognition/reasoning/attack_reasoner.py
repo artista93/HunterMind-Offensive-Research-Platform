@@ -276,3 +276,14 @@ class AttackReasoner:
             "total_actions": sum(len(actions) for actions in self._vulnerability_actions.values())
         }
 
+
+# نسخة عالمية
+_default_reasoner = None
+
+
+async def get_attack_reasoner() -> AttackReasoner:
+    """الحصول على نسخة عالمية من محلل الهجمات"""
+    global _default_reasoner
+    if _default_reasoner is None:
+        _default_reasoner = AttackReasoner()
+    return _default_reasoner

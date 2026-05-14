@@ -286,3 +286,14 @@ class ReflectionEngine:
             "active_session": self._current_session is not None
         }
 
+
+# نسخة عالمية
+_default_engine = None
+
+
+async def get_reflection_engine() -> ReflectionEngine:
+    """الحصول على نسخة عالمية من محرك التأمل"""
+    global _default_engine
+    if _default_engine is None:
+        _default_engine = ReflectionEngine()
+    return _default_engine

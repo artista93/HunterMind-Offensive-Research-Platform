@@ -53,7 +53,7 @@ class EventBus:
         self.max_history = max_history
         self._lock = asyncio.Lock()
         
-        logger.info("EventBus initialized")
+        logger.info(f"EventBus initialized (max_history={max_history})")
     
     async def subscribe(self, event_type: EventType, handler: Callable):
         """الاشتراك في نوع حدث معين"""
@@ -132,3 +132,15 @@ class EventBus:
                 "total_subscribers": sum(len(h) for h in self.subscribers.values()),
                 "max_history": self.max_history
             }
+
+
+# نسخة عالمية
+_default_event_bus = None
+
+
+async def get_event_bus() -> EventBus:
+    """الحصول على نسخة عالمية من ناقل الأحداث"""
+    global _default_event_bus
+    if _default_event_bus is None:
+        _default_event_bus = EventBus()
+    return _default_event_bus
