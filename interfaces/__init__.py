@@ -9,31 +9,17 @@ from . import dashboard
 from . import cli
 from . import reporting
 
-# استيراد من api
-from .api import (
-    Severity, Confidence, ScanType, AttackType,
-    ScanRequest, ScanResponse, ScanResult, Finding,
-    AttackRequest, AttackResponse, AttackResult,
-    ExploitRequest, ExploitResult,
-    app as api_app,
-    get_grpc_server,
-)
+# API
+from .api import app as api_app, get_grpc_server
 
-# استيراد من dashboard
-from .dashboard import (
-    app as dashboard_app,
-    monitor_manager, cognitive_monitor,
-    get_monitor_page, get_cognitive_page, get_visualizer_page,
-)
+# Dashboard
+from .dashboard import app as dashboard_app
+from .dashboard.dashboard_server import DashboardDataManager, data_manager
 
-# استيراد من cli
-from .cli import (
-    CLIRunner, main as cli_main,
-    TerminalUI, Color, get_terminal_ui,
-    CommandParser, Command, CommandType, get_command_parser,
-)
+# CLI
+from .cli import CLIRunner, main as cli_main, TerminalUI, Color, get_terminal_ui
 
-# استيراد من reporting
+# Reporting
 from .reporting import (
     ReportGenerator, get_report_generator,
     JSONExporter, get_json_exporter,
@@ -42,29 +28,10 @@ from .reporting import (
 )
 
 __all__ = [
-    'api',
-    'dashboard',
-    'cli',
-    'reporting',
-    # api
-    'Severity', 'Confidence', 'ScanType', 'AttackType',
-    'ScanRequest', 'ScanResponse', 'ScanResult', 'Finding',
-    'AttackRequest', 'AttackResponse', 'AttackResult',
-    'ExploitRequest', 'ExploitResult',
-    'api_app',
-    'get_grpc_server',
-    # dashboard
-    'dashboard_app',
-    'monitor_manager',
-    'cognitive_monitor',
-    'get_monitor_page',
-    'get_cognitive_page',
-    'get_visualizer_page',
-    # cli
-    'CLIRunner', 'cli_main',
-    'TerminalUI', 'Color', 'get_terminal_ui',
-    'CommandParser', 'Command', 'CommandType', 'get_command_parser',
-    # reporting
+    'api', 'dashboard', 'cli', 'reporting',
+    'api_app', 'get_grpc_server',
+    'dashboard_app', 'DashboardDataManager', 'data_manager',
+    'CLIRunner', 'cli_main', 'TerminalUI', 'Color', 'get_terminal_ui',
     'ReportGenerator', 'get_report_generator',
     'JSONExporter', 'get_json_exporter',
     'PDFExporter', 'get_pdf_exporter',

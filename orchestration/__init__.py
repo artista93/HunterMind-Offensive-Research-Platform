@@ -8,10 +8,10 @@ from .orchestrator import Orchestrator, OrchestratorState, WorkflowStep, get_orc
 from .task_manager import TaskManager, Task, TaskPriority, TaskStatus
 from .cache_manager import CacheManager, CacheEntry
 from .execution_graph import ExecutionGraph, GraphNode
+from .world_state_manager import WorldStateManager, get_world_state_manager
 from . import messaging
 from . import scheduler
 
-# استيراد من messaging
 from .messaging import (
     EventBus, Event, EventType,
     CommandBus, Command,
@@ -20,7 +20,6 @@ from .messaging import (
     MessageRouter, Message, RouteRule,
 )
 
-# استيراد من scheduler
 from .scheduler import (
     AsyncScheduler, ScheduledTask, ScheduleType,
     DistributedScheduler, Node, NodeStatus, DistributedTask,
@@ -41,6 +40,8 @@ __all__ = [
     'CacheEntry',
     'ExecutionGraph',
     'GraphNode',
+    'WorldStateManager',
+    'get_world_state_manager',
     'messaging',
     'scheduler',
     # messaging

@@ -27,8 +27,15 @@ class EventType(Enum):
     TASK_FAIL = "task_fail"
     DATA_RECEIVED = "data_received"
     DATA_SENT = "data_sent"
+    DATA_VULNERABILITY = "data_vulnerability"
+    DATA_ENDPOINT = "data_endpoint"
+    DATA_TECHNOLOGY = "data_technology"
     CONNECTION_ESTABLISHED = "connection_established"
     CONNECTION_CLOSED = "connection_closed"
+    SCAN_STARTED = "scan_started"
+    SCAN_COMPLETED = "scan_completed"
+    SCAN_PAGE_COMPLETE = "scan_page_complete"
+    VULNERABILITY_FOUND = "vulnerability_found"
     CUSTOM = "custom"
 
 

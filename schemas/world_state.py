@@ -1,5 +1,3 @@
-
-
 from enum import Enum
 from typing import List, Dict, Any, Optional, Set
 from dataclasses import dataclass, field
@@ -56,10 +54,10 @@ class AuthLevel(Enum):
 
 class StealthLevel(Enum):
     """مستوى التخفي"""
-    LOW = "low"      # عادي، سريع
-    MEDIUM = "medium" # متوسط، متوازن
-    HIGH = "high"    # عالي، بطيء
-    MAXIMUM = "maximum" # أقصى، بطيء جداً
+    LOW = "low"
+    MEDIUM = "medium"
+    HIGH = "high"
+    MAXIMUM = "maximum"
 
 
 @dataclass
@@ -93,7 +91,7 @@ class DiscoveredTechnology:
     """تقنية مكتشفة"""
     name: str
     version: Optional[str] = None
-    category: str = "unknown"  # framework, server, database, cms, etc.
+    category: str = "unknown"
     confidence: float = 0.7
     discovered_at: datetime = field(default_factory=datetime.now)
 
@@ -141,49 +139,39 @@ class ScanStatistics:
 class WorldState:
     """حالة العالم - تمثل الوضع الحالي للنظام والهدف"""
     
-    # معلومات الهدف
     target_url: str = ""
     target_status: TargetStatus = TargetStatus.UNKNOWN
     target_host: str = ""
     target_ip: Optional[str] = None
     
-    # مرحلة المسح
     phase: ScanPhase = ScanPhase.IDLE
     started_at: Optional[datetime] = None
     current_step: str = ""
     
-    # الحماية
     waf_detected: bool = False
     waf_type: WAFType = WAFType.NONE
     rate_limited: bool = False
     rate_limit_count: int = 0
     
-    # المصادقة
     auth_level: AuthLevel = AuthLevel.NONE
     authenticated: bool = False
     auth_tokens: List[str] = field(default_factory=list)
     
-    # التخفي
     stealth_level: StealthLevel = StealthLevel.MEDIUM
     stealth_score: float = 0.5
     detection_risk: float = 0.0
     
-    # الاكتشافات
     discovered_endpoints: Dict[str, DiscoveredEndpoint] = field(default_factory=dict)
     discovered_technologies: List[DiscoveredTechnology] = field(default_factory=list)
     crawled_urls: Set[str] = field(default_factory=set)
     pending_urls: Set[str] = field(default_factory=set)
     
-    # الثغرات
     vulnerabilities: List[Vulnerability] = field(default_factory=list)
     
-    # الإحصائيات
     statistics: ScanStatistics = field(default_factory=ScanStatistics)
     
-    # الذاكرة المؤقتة
     temp_data: Dict[str, Any] = field(default_factory=dict)
     
-    # الطابع الزمني
     last_update: datetime = field(default_factory=datetime.now)
     
     def update(self, **kwargs):
@@ -195,12 +183,19 @@ class WorldState:
     
     def add_endpoint(self, url: str, method: str = "GET", parameters: List[str] = None) -> DiscoveredEndpoint:
         """إضافة endpoint مكتشف"""
+        # التحقق من عدم التكرار
         if url in self.discovered_endpoints:
             endpoint = self.discovered_endpoints[url]
             endpoint.last_seen = datetime.now()
             endpoint.visit_count += 1
+            # تحديث المعاملات لو فيه جديدة
+            if parameters:
+                for p in parameters:
+                    if p not in endpoint.parameters:
+                        endpoint.parameters.append(p)
             return endpoint
         
+        # إنشاء endpoint جديد
         endpoint = DiscoveredEndpoint(
             url=url,
             method=method,
@@ -212,9 +207,10 @@ class WorldState:
     
     def add_technology(self, name: str, version: str = None, category: str = "unknown", confidence: float = 0.7):
         """إضافة تقنية مكتشفة"""
-        # تجنب التكرار
         for tech in self.discovered_technologies:
             if tech.name == name and tech.version == version:
+                tech.confidence = max(tech.confidence, confidence)
+                tech.discovered_at = datetime.now()
                 return
         
         self.discovered_technologies.append(DiscoveredTechnology(
@@ -226,6 +222,12 @@ class WorldState:
     
     def add_vulnerability(self, vulnerability: Vulnerability):
         """إضافة ثغرة مكتشفة"""
+        # التحقق من نوع المدخلات
+        if vulnerability is None:
+            return
+        if isinstance(vulnerability, str):
+            # لا نضيف string - نتجاهل
+            return
         self.vulnerabilities.append(vulnerability)
         self.statistics.vulnerabilities_found = len(self.vulnerabilities)
     
@@ -250,50 +252,34 @@ class WorldState:
         return [v for v in self.vulnerabilities if v.severity == severity]
     
     def get_critical_vulnerabilities(self) -> List[Vulnerability]:
-        """الحصول على الثغرات الحرجة"""
         return self.get_vulnerabilities_by_severity(Severity.CRITICAL)
     
     def get_high_vulnerabilities(self) -> List[Vulnerability]:
-        """الحصول على الثغرات العالية الخطورة"""
         return self.get_vulnerabilities_by_severity(Severity.HIGH)
     
     def has_waf(self) -> bool:
-        """هل هناك WAF؟"""
         return self.waf_detected
     
     def is_authenticated(self) -> bool:
-        """هل تمت المصادقة؟"""
         return self.authenticated
     
     def get_attack_surface_score(self) -> float:
-        """حساب درجة سطح الهجوم"""
         score = 0.0
-        
-        # عدد الـ endpoints
         score += min(0.3, len(self.discovered_endpoints) / 100)
-        
-        # وجود واجهات API
-        api_count = sum(1 for e in self.discovered_endpoints if "/api/" in e.url)
+        api_count = sum(1 for e in self.discovered_endpoints.values() if "/api/" in e.url)
         score += min(0.2, api_count / 20)
-        
-        # وجود تقنيات معروفة
         score += min(0.2, len(self.discovered_technologies) / 10)
-        
-        # وجود ثغرات
         score += min(0.3, len(self.vulnerabilities) / 10)
-        
         return min(1.0, score)
     
     def get_progress_percentage(self) -> float:
-        """نسبة التقدم في المسح"""
         total = len(self.discovered_endpoints)
         crawled = len(self.crawled_urls)
         if total == 0:
             return 0.0
-        return crawled / total
+        return (crawled / total) * 100
     
     def to_dict(self) -> Dict[str, Any]:
-        """تحويل الحالة إلى قاموس"""
         return {
             "target_url": self.target_url,
             "target_status": self.target_status.value,
@@ -311,7 +297,6 @@ class WorldState:
         }
     
     def reset(self):
-        """إعادة تعيين الحالة (لمسح جديد)"""
         self.discovered_endpoints.clear()
         self.discovered_technologies.clear()
         self.crawled_urls.clear()
@@ -324,7 +309,6 @@ class WorldState:
         self.last_update = datetime.now()
 
 
-# دالة مساعدة لإنشاء حالة أولية
 def create_initial_state(target_url: str) -> WorldState:
     """إنشاء حالة أولية لهدف جديد"""
     from urllib.parse import urlparse
@@ -338,9 +322,7 @@ def create_initial_state(target_url: str) -> WorldState:
         started_at=datetime.now()
     )
     
-    # إضافة الهدف كـ endpoint أولي
     state.add_endpoint(target_url)
     state.add_pending_url(target_url)
     
     return state
-
