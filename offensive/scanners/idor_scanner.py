@@ -1,3 +1,7 @@
+"""
+IDOR Scanner - فاحص ثغرات Insecure Direct Object References
+"""
+
 import asyncio
 import re
 import json
@@ -8,13 +12,6 @@ from collections import defaultdict
 
 from .base_scanner import BaseScanner, ScanContext, Finding, Severity, Confidence
 
-try:
-    import httpx
-    HTTPX_AVAILABLE = True
-except ImportError:
-    HTTPX_AVAILABLE = False
-    import aiohttp
-
 import logging
 
 logger = logging.getLogger(__name__)
@@ -22,6 +19,7 @@ logger = logging.getLogger(__name__)
 
 @dataclass
 class IDORPattern:
+    """نمط IDOR"""
     name: str
     pattern: str
     id_type: str
@@ -32,30 +30,32 @@ class IDORPattern:
 class IDORScanner(BaseScanner):
     """
     فاحص ثغرات Insecure Direct Object References (IDOR)
+    
+    يفحص endpoints اللي فيها user IDs حقيقية فقط
     """
     
-    ID_PATTERNS = {
-        "numeric": re.compile(r'\b([0-9]{1,10})\b'),
-        "uuid": re.compile(r'\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\b', re.I),
-        "hash_md5": re.compile(r'\b[0-9a-f]{32}\b', re.I),
-        "hash_sha1": re.compile(r'\b[0-9a-f]{40}\b', re.I),
-    }
+    # الكلمات اللي بتدل على user objects
+    USER_PATTERNS = [
+        '/user/', '/users/', '/profile/', '/account/',
+        '/member/', '/customer/', '/admin/',
+        '/api/user/', '/api/users/', '/api/profile/',
+    ]
+    
+    # أسماء parameters اللي بتحتوي على user ID
+    USER_ID_PARAMS = ['id', 'user_id', 'uid', 'user', 'account_id', 'customer_id']
     
     COMMON_ENDPOINTS = [
         "/user/", "/users/", "/profile/", "/account/",
-        "/order/", "/orders/", "/invoice/", "/payment/",
         "/api/user/", "/api/users/", "/api/profile/",
-        "/api/order/", "/api/orders/", "/api/invoice/",
     ]
     
     def __init__(
         self,
-        rate_limit: float = 2.0,
-        timeout: int = 30,
-        max_retries: int = 2,
+        rate_limit: float = 1.0,
+        timeout: int = 15,
+        max_retries: int = 1,
         test_increment: bool = True,
-        test_decrement: bool = True,
-        extract_ids_from_responses: bool = True
+        test_decrement: bool = True
     ):
         super().__init__(
             name="IDORScanner",
@@ -65,23 +65,23 @@ class IDORScanner(BaseScanner):
         )
         self._test_increment = test_increment
         self._test_decrement = test_decrement
-        self._extract_ids_from_responses = extract_ids_from_responses
-        self._session = None
         self._tested_endpoints: Set[str] = set()
-        self._discovered_ids: Dict[str, Set[str]] = defaultdict(set)
     
     async def can_scan(self, context: ScanContext) -> bool:
-        url = context.target.url
-        parsed = urlparse(url)
-        path = parsed.path
+        """نتأكد إن الـ URL محتمل يكون فيه IDOR حقيقي"""
+        url = context.target.url.lower()
+        parsed = urlparse(context.target.url)
+        path = parsed.path.lower()
         
-        for endpoint in self.COMMON_ENDPOINTS:
-            if endpoint in path:
+        # فحص الـ path
+        for pattern in self.USER_PATTERNS:
+            if pattern in path:
                 return True
         
+        # فحص الـ parameters
         params = parse_qs(parsed.query)
-        for value in params.values():
-            if value and value[0].isdigit():
+        for param in self.USER_ID_PARAMS:
+            if param.lower() in [p.lower() for p in params.keys()]:
                 return True
         
         return False
@@ -89,215 +89,103 @@ class IDORScanner(BaseScanner):
     async def scan(self, context: ScanContext) -> List[Finding]:
         findings = []
         url = context.target.url
-        
-        # تحليل URL الحالي
-        url_findings = await self._analyze_url(context, url)
-        findings.extend(url_findings)
-        
-        # اختبار نقاط النهاية الشائعة
-        endpoint_findings = await self._test_common_endpoints(context)
-        findings.extend(endpoint_findings)
-        
-        # اختبار المعرفات التزايدية
-        if self._test_increment or self._test_decrement:
-            incremental_findings = await self._test_incremental_ids(context)
-            findings.extend(incremental_findings)
-        
-        return findings
-    
-    async def _analyze_url(self, context: ScanContext, url: str) -> List[Finding]:
-        findings = []
         parsed = urlparse(url)
         
-        # فحص المعاملات
-        params = parse_qs(parsed.query)
-        for param_name, param_values in params.items():
-            for value in param_values:
-                for id_type, pattern in self.ID_PATTERNS.items():
-                    match = pattern.search(value)
-                    if match:
-                        modified_finding = await self._test_id_modification(
-                            context, param_name, value, match.group(), id_type
-                        )
-                        if modified_finding:
-                            findings.append(modified_finding)
+        # استخراج candidate IDs
+        candidates = self._extract_id_candidates(parsed)
         
-        # فحص مسار URL
-        path_parts = parsed.path.split('/')
-        for i, part in enumerate(path_parts):
-            for id_type, pattern in self.ID_PATTERNS.items():
-                match = pattern.search(part)
-                if match and match.group().isdigit():
-                    original_id = match.group()
-                    num_int = int(original_id)
-                    
-                    if self._test_increment:
-                        new_id = str(num_int + 1)
-                        modified_parts = path_parts.copy()
-                        modified_parts[i] = part.replace(original_id, new_id)
-                        test_url = urlunparse(parsed._replace(path='/'.join(modified_parts)))
-                        
-                        response_text = await self.send_request(test_url, method="GET")
-                        if response_text and len(response_text) > 50:
-                            finding = self.add_finding(
-                                vulnerability_type="Insecure Direct Object Reference (IDOR)",
-                                severity=Severity.HIGH,
-                                confidence=Confidence.HIGH,
-                                url=test_url,
-                                parameter=param_name,
-                                payload=f"ID modified from {original_id} to {new_id}",
-                                description=f"IDOR vulnerability discovered. Able to access other resources by changing ID.",
-                                remediation="Implement proper access control checks.",
-                                cvss_score=6.5,
-                                metadata={"original_id": original_id, "modified_id": new_id}
-                            )
-                            findings.append(finding)
-                    
-                    if self._test_decrement and num_int > 1:
-                        new_id = str(num_int - 1)
-                        modified_parts = path_parts.copy()
-                        modified_parts[i] = part.replace(original_id, new_id)
-                        test_url = urlunparse(parsed._replace(path='/'.join(modified_parts)))
-                        
-                        response_text = await self.send_request(test_url, method="GET")
-                        if response_text and len(response_text) > 50:
-                            finding = self.add_finding(
-                                vulnerability_type="Insecure Direct Object Reference (IDOR)",
-                                severity=Severity.HIGH,
-                                confidence=Confidence.HIGH,
-                                url=test_url,
-                                parameter=param_name,
-                                payload=f"ID modified from {original_id} to {new_id}",
-                                description=f"IDOR vulnerability discovered.",
-                                remediation="Implement proper access control checks.",
-                                cvss_score=6.5,
-                                metadata={"original_id": original_id, "modified_id": new_id}
-                            )
-                            findings.append(finding)
+        if not candidates:
+            return findings
         
-        return findings
-    
-    async def _test_id_modification(
-        self,
-        context: ScanContext,
-        param_name: str,
-        original_value: str,
-        extracted_id: str,
-        id_type: str
-    ) -> Optional[Finding]:
-        if not extracted_id.isdigit():
-            return None
-        
-        if self._test_increment:
-            new_id = str(int(extracted_id) + 1)
-            parsed = urlparse(context.target.url)
-            params = parse_qs(parsed.query)
+        for param_name, current_value in candidates:
+            if not current_value.isdigit():
+                continue
             
-            if param_name in params:
-                params[param_name] = [new_id]
-                new_query = urlencode(params, doseq=True)
-                test_url = urlunparse(parsed._replace(query=new_query))
-                
-                response_text = await self.send_request(test_url, method="GET")
-                if response_text and len(response_text) > 50:
-                    return self.add_finding(
-                        vulnerability_type="Insecure Direct Object Reference (IDOR)",
-                        severity=Severity.HIGH,
-                        confidence=Confidence.HIGH,
-                        url=test_url,
-                        parameter=param_name,
-                        payload=f"ID modified from {extracted_id} to {new_id}",
-                        description="IDOR vulnerability discovered.",
-                        remediation="Implement proper access control checks.",
-                        cvss_score=6.5,
-                        metadata={"original_id": extracted_id, "modified_id": new_id}
-                    )
-        
-        return None
-    
-    async def _test_common_endpoints(self, context: ScanContext) -> List[Finding]:
-        findings = []
-        base_url = context.target.url.rstrip('/')
-        
-        for endpoint in self.COMMON_ENDPOINTS:
-            test_ids = [1, 2, 3, 100]
+            current_id = int(current_value)
             
-            for test_id in test_ids:
-                test_url = f"{base_url}{endpoint}{test_id}"
-                
-                response_text = await self.send_request(test_url, method="GET")
-                
-                if response_text and len(response_text) > 100:
-                    if "user" in response_text.lower() or "email" in response_text.lower():
-                        finding = self.add_finding(
-                            vulnerability_type="Insecure Direct Object Reference (IDOR)",
-                            severity=Severity.MEDIUM,
-                            confidence=Confidence.TENTATIVE,
-                            url=test_url,
-                            description=f"Potential IDOR at {endpoint} with ID {test_id}",
-                            remediation="Implement proper access control checks.",
-                            cvss_score=5.3,
-                            metadata={"endpoint": endpoint, "tested_id": test_id}
-                        )
-                        findings.append(finding)
-        
-        return findings
-    
-    async def _test_incremental_ids(self, context: ScanContext) -> List[Finding]:
-        findings = []
-        base_url = context.target.url
-        parsed = urlparse(base_url)
-        path = parsed.path
-        
-        numbers = re.findall(r'\b\d{3,}\b', path)
-        
-        for num in numbers:
-            num_int = int(num)
-            
+            # تجربة IDs مختلفة
+            test_deltas = []
             if self._test_increment:
-                next_id = str(num_int + 1)
-                test_url = base_url.replace(num, next_id)
-                
-                if test_url != base_url:
-                    response_text = await self.send_request(test_url, method="GET")
-                    if response_text and len(response_text) > 50:
-                        finding = self.add_finding(
-                            vulnerability_type="Insecure Direct Object Reference (IDOR)",
-                            severity=Severity.HIGH,
-                            confidence=Confidence.HIGH,
-                            url=test_url,
-                            description="IDOR vulnerability discovered.",
-                            remediation="Implement proper access control checks.",
-                            cvss_score=6.5,
-                            metadata={"original_id": num, "modified_id": next_id}
-                        )
-                        findings.append(finding)
+                test_deltas.extend([1, 2])
+            if self._test_decrement:
+                test_deltas.extend([-1])
             
-            if self._test_decrement and num_int > 1:
-                prev_id = str(num_int - 1)
-                test_url = base_url.replace(num, prev_id)
+            for delta in test_deltas:
+                test_id = current_id + delta
+                if test_id <= 0:
+                    continue
                 
-                if test_url != base_url:
+                test_url = self._build_test_url(parsed, param_name, str(test_id))
+                
+                try:
                     response_text = await self.send_request(test_url, method="GET")
-                    if response_text and len(response_text) > 50:
-                        finding = self.add_finding(
-                            vulnerability_type="Insecure Direct Object Reference (IDOR)",
-                            severity=Severity.HIGH,
-                            confidence=Confidence.HIGH,
-                            url=test_url,
-                            description="IDOR vulnerability discovered.",
-                            remediation="Implement proper access control checks.",
-                            cvss_score=6.5,
-                            metadata={"original_id": num, "modified_id": prev_id}
-                        )
-                        findings.append(finding)
+                    
+                    if response_text and len(response_text) > 100:
+                        # فحص لو الاستجابة فيها بيانات مستخدم تاني
+                        indicators = ['user', 'email', '@', 'username', 'profile', 'account']
+                        found = [i for i in indicators if i in response_text.lower()]
+                        
+                        if len(found) >= 2:
+                            finding = self.add_finding(
+                                vulnerability_type="Insecure Direct Object Reference (IDOR)",
+                                severity=Severity.HIGH,
+                                confidence=Confidence.HIGH,
+                                url=test_url,
+                                parameter=param_name,
+                                payload=f"ID: {current_value} → {test_id}",
+                                evidence=f"Response contains: {', '.join(found)}",
+                                description=f"IDOR: Accessing ID {test_id} returned user data",
+                                remediation="Implement per-resource authorization checks",
+                                cvss_score=7.5,
+                                metadata={"original_id": current_value, "tested_id": test_id}
+                            )
+                            findings.append(finding)
+                            break
+                            
+                except Exception as e:
+                    logger.debug(f"IDOR test failed for {test_url}: {e}")
         
         return findings
     
-    async def close(self):
-        if self._session:
-            if HTTPX_AVAILABLE:
-                await self._session.aclose()
-            else:
-                await self._session.close()
-            self._session = None
+    def _extract_id_candidates(self, parsed) -> List[tuple]:
+        """استخراج candidate IDs من الـ URL"""
+        candidates = []
+        path = parsed.path.lower()
+        
+        # فحص الـ path - نبحث عن رقم بعد user patterns
+        for pattern in self.USER_PATTERNS:
+            if pattern in path:
+                # استخراج الرقم اللي بعد الـ pattern
+                idx = path.find(pattern) + len(pattern)
+                remaining = path[idx:]
+                parts = remaining.split('/')
+                if parts and parts[0].isdigit():
+                    candidates.append((f"path_{pattern}", parts[0]))
+        
+        # فحص الـ query parameters
+        params = parse_qs(parsed.query)
+        for param in self.USER_ID_PARAMS:
+            if param in params:
+                candidates.append((param, params[param][0]))
+        
+        return candidates
+    
+    def _build_test_url(self, parsed, param_name: str, new_value: str) -> str:
+        """بناء URL مع ID جديد"""
+        if param_name.startswith('path_'):
+            pattern = param_name.replace('path_', '')
+            path = parsed.path.lower()
+            idx = path.find(pattern) + len(pattern)
+            
+            old_path = parsed.path
+            remaining = old_path[idx:]
+            parts = remaining.split('/')
+            parts[0] = new_value
+            new_path = old_path[:idx] + '/'.join(parts)
+            
+            return urlunparse(parsed._replace(path=new_path))
+        else:
+            params = parse_qs(parsed.query)
+            params[param_name] = [new_value]
+            new_query = urlencode(params, doseq=True)
+            return urlunparse(parsed._replace(query=new_query))

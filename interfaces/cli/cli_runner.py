@@ -28,14 +28,21 @@ class CLIRunner:
     def __init__(self):
         self.ui = TerminalUI()
         self.orchestrator = None
+        self.smart_orchestrator = None
         self.history: List[str] = []
+        self._active_session: str = None  # جلسة نشطة للفحص
         
         self.commands = {
+            # الفحص
             "scan": self.cmd_scan,
+            "smart": self.cmd_smart,
             "crawl": self.cmd_crawl,
-            "register": self.cmd_register,
+            # المصادقة
             "login": self.cmd_login,
+            "register": self.cmd_register,
+            "sessions": self.cmd_sessions,
             "full": self.cmd_full,
+            # النظام
             "status": self.cmd_status,
             "list": self.cmd_list,
             "show": self.cmd_show,
@@ -49,6 +56,12 @@ class CLIRunner:
         """تأكد من وجود المنسق"""
         if self.orchestrator is None:
             self.orchestrator = await get_orchestrator()
+    
+    async def _ensure_smart_orchestrator(self):
+        """تأكد من وجود المنسق الذكي"""
+        if self.smart_orchestrator is None:
+            from orchestration.smart_orchestrator import get_smart_orchestrator
+            self.smart_orchestrator = await get_smart_orchestrator()
     
     async def run(self, args: argparse.Namespace):
         """تشغيل CLI"""
@@ -105,23 +118,35 @@ class CLIRunner:
     async def cmd_scan(self, args: List[str]):
         """فحص شامل للموقع (زحف + فحص)"""
         if not args:
-            print("Usage: scan <url> [--depth 3] [--max-pages 50]")
+            print("Usage: scan <url> [--depth 3] [--max-pages 50] [--session ID]")
+            print("\n  Full scan with all 9 scanners")
             return
         
         url = args[0]
         depth = 3
         max_pages = 50
+        session_id = None
         
         for i, arg in enumerate(args):
             if arg == "--depth" and i + 1 < len(args):
                 depth = int(args[i + 1])
             if arg == "--max-pages" and i + 1 < len(args):
                 max_pages = int(args[i + 1])
+            if arg == "--session" and i + 1 < len(args):
+                session_id = args[i + 1]
         
         print(f"\n{Color.BRIGHT_CYAN}🔍 Starting comprehensive scan on {url}{Color.RESET}")
         print(f"{'='*60}\n")
         
         await self._ensure_orchestrator()
+        
+        # تحميل الجلسة إذا وجدت
+        if session_id:
+            print(f"🔐 Loading session: {session_id}")
+        elif self._active_session:
+            session_id = self._active_session
+            print(f"🔐 Using active session: {session_id}")
+        
         result = await self.orchestrator.execute_full_scan(url, depth, max_pages)
         
         # عرض النتائج
@@ -130,15 +155,61 @@ class CLIRunner:
         print(f"{Color.BRIGHT_GREEN}{'='*60}{Color.RESET}")
         print(f"   Target: {url}")
         print(f"   Pages scanned: {result.get('pages_scanned', 0)}")
-        print(f"   Total vulnerabilities: {result.get('total_findings', 0)}")
+        print(f"   Total vulnerabilities: {result.get('total_vulnerabilities', result.get('total_findings', 0))}")
         
-        if result.get('findings'):
+        vulns = result.get('vulnerabilities', result.get('findings', []))
+        if vulns:
             print(f"\n{Color.CYAN}📊 Findings:{Color.RESET}")
-            for f in result['findings'][:10]:
-                severity_color = Color.RED if f['severity'] in ['critical', 'high'] else Color.YELLOW
-                print(f"   {severity_color}[{f['severity'].upper()}]{Color.RESET} {f['type']} - {f['url'][:60]}")
-            if len(result['findings']) > 10:
-                print(f"   ... and {len(result['findings']) - 10} more")
+            for f in vulns[:10]:
+                sev = f.get('severity', 'info') if isinstance(f, dict) else str(f.severity.value)
+                sev_str = str(sev).upper()
+                severity_color = Color.RED if sev_str in ['CRITICAL', 'HIGH'] else Color.YELLOW
+                url_str = f.get('url', '') if isinstance(f, dict) else str(f.url)
+                type_str = f.get('type', '') if isinstance(f, dict) else str(f.vulnerability_type)
+                print(f"   {severity_color}[{sev_str}]{Color.RESET} {type_str} - {url_str[:60]}")
+            if len(vulns) > 10:
+                print(f"   ... and {len(vulns) - 10} more")
+    
+    async def cmd_smart(self, args: List[str]):
+        """🧠 فحص ذكي - يفهم الموقع قبل الفحص"""
+        if not args:
+            print("Usage: smart <url> [--depth 2] [--max-pages 10]")
+            print("\n  Smart scan: extracts real forms, links, and APIs before scanning")
+            return
+        
+        url = args[0]
+        depth = 2
+        max_pages = 10
+        
+        for i, arg in enumerate(args):
+            if arg == "--depth" and i + 1 < len(args):
+                depth = int(args[i + 1])
+            if arg == "--max-pages" and i + 1 < len(args):
+                max_pages = int(args[i + 1])
+        
+        print(f"\n{Color.BRIGHT_CYAN}🧠 Starting SMART scan on {url}{Color.RESET}")
+        print(f"{'='*60}\n")
+        
+        await self._ensure_smart_orchestrator()
+        result = await self.smart_orchestrator.smart_scan(url, depth, max_pages)
+        
+        print(f"\n{Color.BRIGHT_GREEN}{'='*60}{Color.RESET}")
+        print(f"{Color.BRIGHT_GREEN}✅ SMART SCAN COMPLETED!{Color.RESET}")
+        print(f"{Color.BRIGHT_GREEN}{'='*60}{Color.RESET}")
+        print(f"   Target: {url}")
+        print(f"   Pages found: {result.get('pages_found', 0)}")
+        print(f"   Forms discovered: {result.get('forms_found', 0)}")
+        print(f"   API Endpoints: {result.get('api_endpoints_found', 0)}")
+        print(f"   Targets scanned: {result.get('targets_scanned', 0)}")
+        print(f"   Vulnerabilities found: {result.get('vulnerabilities_count', 0)}")
+        print(f"   Duration: {result.get('duration_seconds', 0):.1f}s")
+        
+        if result.get('vulnerabilities'):
+            print(f"\n{Color.CYAN}📊 Findings:{Color.RESET}")
+            for v in result['vulnerabilities'][:10]:
+                sev = v.get('severity', 'INFO')
+                severity_color = Color.RED if sev in ['CRITICAL', 'HIGH'] else Color.YELLOW
+                print(f"   {severity_color}[{sev}]{Color.RESET} {v.get('type', '?')} - {v.get('url', '')[:60]}")
     
     async def cmd_crawl(self, args: List[str]):
         """زحف الموقع لاكتشاف جميع الصفحات"""
@@ -166,7 +237,64 @@ class CLIRunner:
         print(f"   Forms found: {result.get('total_forms', 0)}")
         print(f"   API endpoints: {result.get('total_apis', 0)}")
     
-    # ==================== أوامر التسجيل والمصادقة ====================
+    # ==================== أوامر المصادقة ====================
+    
+    async def cmd_login(self, args: List[str]):
+        """🔐 تسجيل دخول تفاعلي ذكي - يكتشف حقول النموذج تلقائياً"""
+        if not args:
+            print("Usage: login <url> [--username <u>] [--password <p>]")
+            print("\n  Interactive login wizard:")
+            print("  - Auto-detects form fields (email, password, CSRF, 2FA, CAPTCHA)")
+            print("  - Asks for missing credentials interactively")
+            print("  - Saves session for later scanning")
+            print("\n  Examples:")
+            print("    login https://example.com/login")
+            print("    login https://example.com/login --username admin --password pass123")
+            return
+        
+        url = args[0]
+        username = None
+        password = None
+        
+        for i, arg in enumerate(args):
+            if arg == "--username" and i + 1 < len(args):
+                username = args[i + 1]
+            if arg == "--password" and i + 1 < len(args):
+                password = args[i + 1]
+        
+        from infrastructure.auth.interactive_login import get_interactive_login
+        
+        login_manager = get_interactive_login()
+        session = await login_manager.login(url, username, password)
+        
+        if session:
+            self._active_session = session.session_id
+            print(f"\n{Color.BRIGHT_GREEN}✅ Session saved & activated!{Color.RESET}")
+            print(f"   Session ID: {Color.CYAN}{session.session_id}{Color.RESET}")
+            print(f"   Now use: {Color.CYAN}scan <url>{Color.RESET} to scan with this session")
+            print(f"   Or: {Color.CYAN}sessions{Color.RESET} to list all saved sessions")
+        else:
+            print(f"\n{Color.RED}❌ Login failed. Check URL and credentials.{Color.RESET}")
+    
+    async def cmd_sessions(self, args: List[str]):
+        """📋 عرض الجلسات المحفوظة"""
+        from infrastructure.auth.interactive_login import get_interactive_login
+        
+        login_manager = get_interactive_login()
+        sessions = login_manager.list_sessions()
+        
+        if not sessions:
+            print(f"\n📭 No saved sessions")
+            print(f"   Use: login <url> to create a session")
+            return
+        
+        print(f"\n{Color.BRIGHT_CYAN}📋 Saved Sessions{Color.RESET}")
+        print(f"{'='*50}")
+        for s in sessions:
+            marker = " ← ACTIVE" if s == self._active_session else ""
+            print(f"   {Color.CYAN}{s}{Color.RESET}{marker}")
+        
+        print(f"\n   Use: scan <url> --session <ID> to use a session")
     
     async def cmd_register(self, args: List[str]):
         """إنشاء حساب جديد (تلقائي)"""
@@ -196,32 +324,6 @@ class CLIRunner:
         else:
             print(f"{Color.RED}❌ Registration failed: {result.get('message')}{Color.RESET}")
     
-    async def cmd_login(self, args: List[str]):
-        """تسجيل الدخول بحساب موجود"""
-        username = None
-        password = None
-        
-        for i, arg in enumerate(args):
-            if arg == "--username" and i + 1 < len(args):
-                username = args[i + 1]
-            if arg == "--password" and i + 1 < len(args):
-                password = args[i + 1]
-        
-        if not username or not password:
-            print("Usage: login --username <u> --password <p>")
-            return
-        
-        print(f"\n{Color.BRIGHT_CYAN}🔐 Logging in as {username}...{Color.RESET}\n")
-        
-        await self._ensure_orchestrator()
-        result = await self.orchestrator.login(username, password)
-        
-        if result.get('success'):
-            print(f"{Color.BRIGHT_GREEN}✅ Login successful!{Color.RESET}")
-            print(f"   Session saved for {username}")
-        else:
-            print(f"{Color.RED}❌ Login failed: {result.get('message')}{Color.RESET}")
-    
     async def cmd_full(self, args: List[str]):
         """أتمتة كاملة: تسجيل → دخول → فحص"""
         if not args:
@@ -232,18 +334,14 @@ class CLIRunner:
         target_url = args[1] if len(args) > 1 else register_url
         
         print(f"\n{Color.BRIGHT_CYAN}🔄 Starting FULL automation{Color.RESET}")
-        print(f"{'='*60}\n")
         
         await self._ensure_orchestrator()
         result = await self.orchestrator.full_automation(register_url, target_url)
         
         if result.get('success'):
-            print(f"\n{Color.BRIGHT_GREEN}{'='*60}{Color.RESET}")
-            print(f"{Color.BRIGHT_GREEN}🎉 FULL AUTOMATION COMPLETED!{Color.RESET}")
-            print(f"{Color.BRIGHT_GREEN}{'='*60}{Color.RESET}")
+            print(f"\n{Color.BRIGHT_GREEN}🎉 FULL AUTOMATION COMPLETED!{Color.RESET}")
             print(f"   Username: {result.get('username')}")
-            print(f"   Password: {result.get('password')}")
-            print(f"   Vulnerabilities: {result.get('total_findings', 0)}")
+            print(f"   Vulnerabilities: {result.get('total_findings', result.get('total_vulnerabilities', 0))}")
         else:
             print(f"{Color.RED}❌ Automation failed: {result.get('message')}{Color.RESET}")
     
@@ -258,10 +356,18 @@ class CLIRunner:
         print(f"{'='*50}")
         print(f"   Status: {Color.BRIGHT_GREEN}🟢 Running{Color.RESET}")
         print(f"   Components: {status.get('components', 0)}")
-        print(f"   Active components: {', '.join(status.get('components_list', [])[:5])}")
         print(f"   Total scans: {status.get('total_scans', 0)}")
         print(f"   Total vulnerabilities: {status.get('total_vulnerabilities', 0)}")
         print(f"   Registered accounts: {status.get('total_accounts', 0)}")
+        
+        if self._active_session:
+            print(f"   Active session: {Color.CYAN}{self._active_session}{Color.RESET}")
+        
+        # WorldState
+        ws = status.get('world_state', {})
+        if ws and ws.get('phase') != 'not_initialized':
+            print(f"   WorldState phase: {ws.get('phase', 'N/A')}")
+            print(f"   Endpoints: {ws.get('endpoints', 0)}")
         print("")
     
     async def cmd_list(self, args: List[str]):
@@ -271,16 +377,15 @@ class CLIRunner:
             return
         
         list_type = args[0].lower()
-        
         await self._ensure_orchestrator()
         
         if list_type == "scans":
             scans = await self.orchestrator.list_scans()
             if scans:
                 print(f"\n{Color.BRIGHT_CYAN}📋 Recent Scans{Color.RESET}")
-                print(f"{'='*80}")
                 for s in scans[:10]:
-                    print(f"   {s['id']} | {s['target'][:50]} | {s['findings_count']} findings")
+                    vc = s.get('vulnerabilities_count', s.get('findings_count', 0))
+                    print(f"   {s['id']} | {str(s.get('target', ''))[:50]} | {vc} vulns")
             else:
                 print("\n📭 No scans found")
         
@@ -288,10 +393,10 @@ class CLIRunner:
             vulns = await self.orchestrator.list_vulnerabilities()
             if vulns:
                 print(f"\n{Color.BRIGHT_CYAN}🔍 Vulnerabilities{Color.RESET}")
-                print(f"{'='*80}")
                 for v in vulns[:20]:
-                    severity_color = Color.RED if v['severity'] in ['critical', 'high'] else Color.YELLOW
-                    print(f"   {severity_color}[{v['severity'].upper()}]{Color.RESET} {v['type']} - {v['url'][:60]}")
+                    sev = str(v.get('severity', 'info')).upper()
+                    severity_color = Color.RED if sev in ['CRITICAL', 'HIGH'] else Color.YELLOW
+                    print(f"   {severity_color}[{sev}]{Color.RESET} {v.get('type', '?')} - {str(v.get('url', ''))[:60]}")
             else:
                 print("\n🎉 No vulnerabilities found")
         
@@ -299,15 +404,13 @@ class CLIRunner:
             accounts = await self.orchestrator.list_registered_accounts()
             if accounts:
                 print(f"\n{Color.BRIGHT_CYAN}📋 Registered Accounts{Color.RESET}")
-                print(f"{'='*80}")
                 for a in accounts:
-                    print(f"   {a['username']} | {a['email']} | {a['url'][:40]}")
+                    print(f"   {a['username']} | {a.get('email', 'N/A')}")
             else:
                 print("\n📭 No registered accounts")
         
         elif list_type == "agents":
             print(f"\n{Color.BRIGHT_CYAN}🤖 Available Agents{Color.RESET}")
-            print(f"{'='*40}")
             agents = await self.orchestrator.list_agents()
             for a in agents:
                 print(f"   - {a}")
@@ -320,31 +423,27 @@ class CLIRunner:
         
         item_type = args[0].lower()
         item_id = args[1]
-        
         await self._ensure_orchestrator()
         
         if item_type == "scan":
             details = await self.orchestrator.get_scan_details(item_id)
             if details:
                 print(f"\n{Color.BRIGHT_CYAN}📄 Scan Details: {item_id}{Color.RESET}")
-                print(f"{'='*50}")
-                print(f"   Target: {details.get('target')}")
+                print(f"   Target: {details.get('target', 'N/A')}")
                 print(f"   Pages: {details.get('pages_scanned', 0)}")
-                print(f"   Findings: {details.get('findings_count', 0)}")
-                print(f"   Date: {details.get('date')}")
+                print(f"   Findings: {details.get('findings_count', details.get('vulnerabilities_count', 0))}")
+                print(f"   Date: {details.get('date', 'N/A')}")
             else:
                 print(f"Scan {item_id} not found")
         
         elif item_type == "vulnerability":
             details = await self.orchestrator.get_vulnerability_details(item_id)
             if details:
-                print(f"\n{Color.BRIGHT_CYAN}🔍 Vulnerability Details: {item_id}{Color.RESET}")
-                print(f"{'='*50}")
-                print(f"   Type: {details.get('type')}")
-                print(f"   Severity: {details.get('severity')}")
-                print(f"   URL: {details.get('url')}")
-                print(f"   Parameter: {details.get('parameter')}")
-                print(f"   Payload: {details.get('payload', 'N/A')[:100]}")
+                print(f"\n{Color.BRIGHT_CYAN}🔍 Vulnerability: {item_id}{Color.RESET}")
+                print(f"   Type: {details.get('type', 'N/A')}")
+                print(f"   Severity: {details.get('severity', 'N/A')}")
+                print(f"   URL: {details.get('url', 'N/A')}")
+                print(f"   Parameter: {details.get('parameter', 'N/A')}")
             else:
                 print(f"Vulnerability {item_id} not found")
     
@@ -361,12 +460,14 @@ class CLIRunner:
 ╠══════════════════════════════════════════════════════════════════╣
 ║                                                                    ║
 ║  {Color.BRIGHT_WHITE}CRAWLING & SCANNING{Color.RESET}                                             ║
-║    scan <url> [--depth 3] [--max-pages 50]  - Full scan (crawl + scan)
+║    scan <url> [--depth 3] [--max-pages 50]  - Full scan           ║
+║    smart <url> [--depth 2] [--max-pages 10] - Smart scan 🧠       ║
 ║    crawl <url> [--depth 3] [--max-pages 100] - Crawl only         ║
 ║                                                                    ║
-║  {Color.BRIGHT_WHITE}REGISTRATION & AUTH{Color.RESET}                                            ║
+║  {Color.BRIGHT_WHITE}AUTHENTICATION{Color.RESET}                                                   ║
+║    login <url> [--username u] [--password p]  - Interactive login 🔐║
 ║    register <url> [--username u] [--password p] - Auto register   ║
-║    login --username u --password p            - Login              ║
+║    sessions                                   - List saved sessions║
 ║    full <reg_url> <target>                   - Register → Scan    ║
 ║                                                                    ║
 ║  {Color.BRIGHT_WHITE}SYSTEM{Color.RESET}                                                        ║
@@ -379,6 +480,8 @@ class CLIRunner:
 ║                                                                    ║
 ╚══════════════════════════════════════════════════════════════════╝
 {Color.BRIGHT_GREEN}✅ Connected to REAL orchestrator & scanners!{Color.RESET}
+{Color.YELLOW}🧠 Smart scan available: extracts real forms, links & APIs{Color.RESET}
+{Color.CYAN}🔐 Interactive login: auto-detects form fields{Color.RESET}
 """)
     
     async def cmd_exit(self, args: List[str]):

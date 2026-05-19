@@ -1,0 +1,38 @@
+{
+  "by_header": {
+    "cf-ray": "Cloudflare",
+    "__cfduid": "Cloudflare",
+    "cf-cache-status": "Cloudflare",
+    "x-amzn-requestid": "AWS WAF",
+    "x-amzn-errortype": "AWS WAF",
+    "modsecurity": "ModSecurity",
+    "owasp": "ModSecurity",
+    "x-cdn": "Imperva",
+    "x-iinfo": "Imperva",
+    "x-sucuri": "Sucuri",
+    "x-sucuri-id": "Sucuri"
+  },
+  "by_cookie": {
+    "__cfduid": "Cloudflare",
+    "__cf_bm": "Cloudflare",
+    "incap_ses": "Imperva",
+    "visid_incap": "Imperva",
+    "sucuri": "Sucuri",
+    "cloudproxy": "Sucuri"
+  },
+  "by_response": {
+    "cloudflare": "Cloudflare",
+    "cdn-cgi": "Cloudflare",
+    "attention required": "Cloudflare",
+    "aws waf": "AWS WAF",
+    "awswaf": "AWS WAF",
+    "request blocked": "AWS WAF",
+    "modsecurity": "ModSecurity",
+    "request rejected": "ModSecurity",
+    "not acceptable": "ModSecurity",
+    "incapsula": "Imperva",
+    "imperva": "Imperva",
+    "sucuri": "Sucuri",
+    "cloudproxy": "Sucuri"
+  }
+}

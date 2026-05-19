@@ -1,27 +1,6 @@
-# infrastructure/auth/__init__.py
-
 """
-Auth Module - إدارة المصادقة والجلسات
+Auth Module - نظام المصادقة التفاعلي
 """
+from .interactive_login import InteractiveLogin, LoginSession, LoginField, get_interactive_login
 
-from .auth_manager import (
-    AuthManager,
-    AuthType,
-    AuthStatus,
-    AuthCredentials,
-    AuthSession,
-    BrowserFingerprint,
-    LoginFormDetector,
-    get_auth_manager,
-)
-
-__all__ = [
-    'AuthManager',
-    'AuthType',
-    'AuthStatus',
-    'AuthCredentials',
-    'AuthSession',
-    'BrowserFingerprint',
-    'LoginFormDetector',
-    'get_auth_manager',
-]
+__all__ = ['InteractiveLogin', 'LoginSession', 'LoginField', 'get_interactive_login']
