@@ -1,0 +1,12 @@
+{
+  "url": "https://tryhackme.com/login",
+  "cookies": {
+    "connect.sid": "s%3AkkxawYYUk0zEPELccpZfsKfXRSsYtEIp.Fx3zgC0FEANHF5fMN6PXz4YvyR1vUf7BwcKYTK0xqm4"
+  },
+  "headers": {},
+  "tokens": {},
+  "csrf_token": "",
+  "session_id": "manual_20260520004424",
+  "created_at": "2026-05-20T00:44:05.600154",
+  "user_agent": ""
+}

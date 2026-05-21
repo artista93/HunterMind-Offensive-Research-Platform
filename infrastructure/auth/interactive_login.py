@@ -2,7 +2,7 @@
 Interactive Login - نظام تسجيل دخول تفاعلي ذكي
 
 يدعم:
-- استخراج تلقائي لحقول النموذج
+- استخراج تلقائي لحقول النموذج (BeautifulSoup + Playwright fallback)
 - طلب البيانات المفقودة من المستخدم
 - التعامل مع 2FA / CAPTCHA
 - حفظ الجلسة كاملة (cookies + headers + tokens)
@@ -17,7 +17,6 @@ from typing import Dict, List, Optional, Any, Tuple
 from dataclasses import dataclass, field
 from datetime import datetime
 from urllib.parse import urljoin, urlparse
-from bs4 import BeautifulSoup
 
 import httpx
 import logging
@@ -29,26 +28,22 @@ logger = logging.getLogger(__name__)
 class LoginField:
     """حقل في نموذج تسجيل الدخول"""
     name: str
-    type: str  # email, password, text, hidden, submit, captcha, 2fa
+    type: str
     label: str
     placeholder: str = ""
     required: bool = False
     value: str = ""
     autocomplete: str = ""
-    error_message: str = ""
     
     def ask_user(self) -> str:
-        """طلب قيمة الحقل من المستخدم"""
         if self.type == "password":
             import getpass
             return getpass.getpass(f"  🔒 {self.label or self.name}: ")
         elif self.type == "captcha":
-            print(f"  🛡️  CAPTCHA detected! Please solve manually in browser")
-            print(f"  📋 Then paste the token here:")
+            print(f"  🛡️  CAPTCHA detected! Open the page in browser and paste token:")
             return input(f"  CAPTCHA token: ")
         elif self.type == "2fa":
-            print(f"  📱 2FA code required!")
-            return input(f"  {self.label or 'Verification code'}: ")
+            return input(f"  📱 {self.label or 'Verification code'}: ")
         else:
             return input(f"  📝 {self.label or self.name}: ")
 
@@ -66,102 +61,39 @@ class LoginSession:
     user_agent: str = ""
     
     def save(self, path: str = "sessions"):
-        """حفظ الجلسة إلى ملف"""
         os.makedirs(path, exist_ok=True)
         filepath = f"{path}/session_{self.session_id}.json"
-        
         with open(filepath, 'w') as f:
             json.dump({
-                "url": self.url,
-                "cookies": self.cookies,
-                "headers": self.headers,
-                "tokens": self.tokens,
-                "csrf_token": self.csrf_token,
-                "session_id": self.session_id,
-                "created_at": self.created_at,
-                "user_agent": self.user_agent,
+                "url": self.url, "cookies": self.cookies,
+                "headers": self.headers, "tokens": self.tokens,
+                "csrf_token": self.csrf_token, "session_id": self.session_id,
+                "created_at": self.created_at, "user_agent": self.user_agent,
             }, f, indent=2)
-        
-        logger.info(f"Session saved to {filepath}")
         return filepath
     
     @classmethod
     def load(cls, filepath: str) -> Optional['LoginSession']:
-        """تحميل جلسة من ملف"""
         if not os.path.exists(filepath):
             return None
-        
         with open(filepath, 'r') as f:
             data = json.load(f)
-        
-        session = cls(
-            url=data.get("url", ""),
-            cookies=data.get("cookies", {}),
-            headers=data.get("headers", {}),
-            tokens=data.get("tokens", {}),
-            csrf_token=data.get("csrf_token", ""),
-            session_id=data.get("session_id", ""),
-            created_at=data.get("created_at", ""),
-            user_agent=data.get("user_agent", ""),
-        )
-        
-        return session
+        return cls(**{k: data.get(k, "") for k in ['url', 'cookies', 'headers', 'tokens', 'csrf_token', 'session_id', 'created_at', 'user_agent']})
 
 
 class InteractiveLogin:
-    """
-    نظام تسجيل دخول تفاعلي ذكي
-    
-    يتعامل مع:
-    - Single-page login (email + password)
-    - Multi-step login (email → password → 2FA)
-    - CAPTCHA detection (يعرض للمستخدم)
-    - CSRF tokens
-    - OAuth/SSO redirects
-    """
+    """نظام تسجيل دخول تفاعلي ذكي"""
     
     USER_AGENTS = [
-        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
-        "Mozilla/5.0 (Macintosh; Intel Mac OS X 14_4_1) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/124.0.0.0 Safari/537.36",
+        "Mozilla/5.0 (Macintosh; Intel Mac OS X 14_4_1) AppleWebKit/537.36 Chrome/124.0.0.0 Safari/537.36",
     ]
     
     def __init__(self):
         self.client = None
         self.session = LoginSession(url="")
-        self._step_history: List[Dict] = []
-        
-        logger.info("InteractiveLogin initialized")
-    
-    async def _create_client(self) -> httpx.AsyncClient:
-        """إنشاء عميل HTTP مع cookies"""
-        import random
-        
-        return httpx.AsyncClient(
-            timeout=30,
-            follow_redirects=True,
-            verify=False,
-            headers={
-                "User-Agent": random.choice(self.USER_AGENTS),
-                "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-                "Accept-Language": "en-US,en;q=0.9",
-                "Accept-Encoding": "gzip, deflate, br",
-                "Connection": "keep-alive",
-                "Upgrade-Insecure-Requests": "1",
-            }
-        )
     
     async def login(self, login_url: str, username: str = None, password: str = None) -> Optional[LoginSession]:
-        """
-        تسجيل دخول تفاعلي ذكي
-        
-        Args:
-            login_url: رابط صفحة تسجيل الدخول
-            username: اسم المستخدم (اختياري - سيطلبه إذا لم يقدم)
-            password: كلمة المرور (اختياري - سيطلبها إذا لم يقدم)
-        
-        Returns:
-            LoginSession محفوظة أو None
-        """
         print(f"\n🔐 Interactive Login Wizard")
         print(f"{'='*50}")
         print(f"   Target: {login_url}")
@@ -169,440 +101,345 @@ class InteractiveLogin:
         self.session = LoginSession(url=login_url)
         self.session.created_at = datetime.now().isoformat()
         
-        self.client = await self._create_client()
+        import random
+        self.client = httpx.AsyncClient(
+            timeout=30, follow_redirects=True, verify=False,
+            headers={"User-Agent": random.choice(self.USER_AGENTS),
+                     "Accept": "text/html,application/xhtml+xml,*/*;q=0.8",
+                     "Accept-Language": "en-US,en;q=0.9"}
+        )
         
         try:
-            # الخطوة 1: تحميل صفحة login
-            print(f"\n📄 Step 1: Loading login page...")
-            login_page = await self._fetch_page(login_url)
-            
-            if not login_page:
-                print(f"❌ Cannot access {login_url}")
+            # الخطوة 1: تحميل الصفحة
+            print(f"\n📄 Step 1: Loading page...")
+            html = await self._fetch(login_url)
+            if not html:
                 return None
             
-            # الخطوة 2: استخراج النموذج
-            print(f"🔍 Step 2: Analyzing login form...")
-            form_info = self._extract_login_form(login_page, login_url)
+            # الخطوة 2: استخراج النموذج - نجرب BeautifulSoup أولاً، ثم Playwright
+            print(f"🔍 Step 2: Detecting login form...")
+            form_info = self._extract_form_bs4(html, login_url)
             
             if not form_info:
-                print(f"❌ No login form found on page")
+                print(f"   ⚠️  Static detection failed, trying browser...")
+                form_info = await self._extract_form_playwright(login_url)
+            
+            if not form_info:
+                print(f"   ℹ️  Trying generic detection...")
+                form_info = self._extract_form_generic(html, login_url)
+            
+            if not form_info:
+                print(f"❌ No login form found. Try manual login:")
+                print(f"   Open the page in browser, login, then paste any cookie:")
+                cookie = input(f"   📋 Cookie (name=value): ").strip()
+                if cookie and '=' in cookie:
+                    name, value = cookie.split('=', 1)
+                    self.session.cookies[name] = value
+                    self.session.session_id = f"manual_{datetime.now().strftime('%Y%m%d%H%M%S')}"
+                    self.session.save()
+                    print(f"✅ Session saved manually!")
+                    return self.session
                 return None
             
-            # عرض الحقول المكتشفة
-            print(f"\n   📋 Form fields detected:")
-            for field in form_info['fields']:
-                print(f"      - {field.type}: {field.name} ({field.label})")
+            # عرض الحقول
+            print(f"\n   📋 Fields found:")
+            for f in form_info['fields']:
+                print(f"      - {f.type}: {f.name} ({f.label})")
             
-            # الخطوة 3: جمع البيانات المطلوبة
-            print(f"\n📝 Step 3: Gathering credentials...")
-            
+            # الخطوة 3: جمع البيانات
+            print(f"\n📝 Step 3: Enter credentials...")
             form_data = {}
-            
             for field in form_info['fields']:
                 if field.type == "hidden":
                     form_data[field.name] = field.value
-                
                 elif field.type == "email":
-                    if username:
+                    form_data[field.name] = username or field.ask_user()
+                elif field.type == "password":
+                    form_data[field.name] = password or field.ask_user()
+                elif field.type == "submit":
+                    form_data[field.name] = field.value or "Login"
+                elif field.type in ["captcha", "2fa"]:
+                    form_data[field.name] = field.ask_user()
+                else:
+                    if username and ("user" in field.name.lower() or "login" in field.name.lower()):
                         form_data[field.name] = username
                     else:
                         form_data[field.name] = field.ask_user()
-                
-                elif field.type == "password":
-                    if password:
-                        form_data[field.name] = password
-                    else:
-                        form_data[field.name] = field.ask_user()
-                
-                elif field.type == "text":
-                    if "user" in field.name.lower() or "login" in field.name.lower():
-                        if username:
-                            form_data[field.name] = username
-                        else:
-                            form_data[field.name] = input(f"  📝 {field.label or field.name}: ")
-                    else:
-                        form_data[field.name] = field.ask_user()
-                
-                elif field.type == "submit":
-                    form_data[field.name] = field.value or "Login"
-                
-                elif field.type in ["captcha", "2fa"]:
-                    form_data[field.name] = field.ask_user()
             
-            # إضافة CSRF token إذا وجد
             if form_info.get('csrf_token'):
                 form_data[form_info['csrf_name']] = form_info['csrf_token']
                 self.session.csrf_token = form_info['csrf_token']
             
-            # الخطوة 4: إرسال النموذج
-            print(f"\n🚀 Step 4: Submitting login...")
-            
-            result = await self._submit_login(
-                form_info['action'],
-                form_info['method'],
-                form_data,
-                login_url
-            )
+            # الخطوة 4: إرسال
+            print(f"\n🚀 Step 4: Submitting...")
+            result = await self._submit(form_info['action'], form_info['method'], form_data, login_url)
             
             if result['success']:
-                # حفظ الجلسة
                 import uuid
                 self.session.session_id = str(uuid.uuid4())[:8]
-                self.session.cookies = result.get('cookies', {})
-                self.session.headers = result.get('headers', {})
-                self.session.tokens = result.get('tokens', {})
-                self.session.user_agent = self.USER_AGENTS[0]
-                
-                session_path = self.session.save()
-                
-                print(f"\n{'='*50}")
-                print(f"✅ Login Successful!")
-                print(f"   Session saved: {session_path}")
-                print(f"   Cookies: {len(self.session.cookies)} items")
-                print(f"   Tokens: {list(self.session.tokens.keys())}")
-                
+                self.session.cookies.update(result.get('cookies', {}))
+                self.session.headers.update(result.get('headers', {}))
+                self.session.tokens.update(result.get('tokens', {}))
+                self.session.save()
+                print(f"\n✅ Login Successful! Session: {self.session.session_id}")
                 return self.session
-            
             else:
-                # تحليل رسالة الخطأ
-                error_msg = result.get('error', 'Unknown error')
-                print(f"\n❌ Login Failed: {error_msg}")
-                
-                # فحص multi-step login
+                print(f"\n❌ Failed: {result.get('error', 'Unknown')}")
                 if result.get('next_step'):
-                    print(f"\n🔄 Multi-step login detected!")
-                    return await self._handle_multi_step(result, form_data, login_url)
-                
+                    print(f"🔄 Multi-step detected! Complete in browser and paste cookie:")
+                    cookie = input(f"   📋 Cookie: ").strip()
+                    if cookie and '=' in cookie:
+                        name, value = cookie.split('=', 1)
+                        self.session.cookies[name] = value
+                        self.session.session_id = f"multi_{datetime.now().strftime('%Y%m%d%H%M%S')}"
+                        self.session.save()
+                        return self.session
                 return None
         
         finally:
             if self.client:
                 await self.client.aclose()
     
-    async def _fetch_page(self, url: str) -> Optional[str]:
-        """جلب صفحة"""
+    async def _fetch(self, url: str) -> Optional[str]:
         try:
-            response = await self.client.get(url)
-            
-            if response.status_code == 200:
-                return response.text
-            
-            logger.warning(f"Page returned {response.status_code}")
-            return response.text if response.status_code < 500 else None
-            
-        except Exception as e:
-            logger.error(f"Failed to fetch {url}: {e}")
+            r = await self.client.get(url)
+            return r.text if r.status_code < 500 else None
+        except:
             return None
     
-    def _extract_login_form(self, html: str, base_url: str) -> Optional[Dict]:
-        """استخراج نموذج تسجيل الدخول"""
+    def _extract_form_bs4(self, html: str, base_url: str) -> Optional[Dict]:
+        """BeautifulSoup extraction"""
+        try:
+            from bs4 import BeautifulSoup
+        except ImportError:
+            return None
+        
         soup = BeautifulSoup(html, 'html.parser')
         
-        # البحث عن نموذج login
-        login_form = None
-        
+        # البحث عن form فيه password
         for form in soup.find_all('form'):
-            form_text = form.get_text().lower()
-            if any(word in form_text for word in ['login', 'sign in', 'log in', 'email', 'password']):
-                login_form = form
-                break
+            has_password = form.find('input', {'type': 'password'})
+            has_email = form.find('input', {'type': 'email'})
+            has_text = form.find('input', {'type': 'text'})
+            
+            if has_password and (has_email or has_text):
+                return self._parse_form(form, base_url)
         
-        # لو ملناش form، ندور على input fields مباشرة
-        if not login_form:
-            # جمع كل input fields في الصفحة
-            inputs = soup.find_all('input')
-            if inputs:
-                login_form = soup  # نستخدم الصفحة كلها
-            else:
-                return None
+        # لو مفيش form كامل، ندور على أي input password
+        pw_input = soup.find('input', {'type': 'password'})
+        if pw_input:
+            parent_form = pw_input.find_parent('form')
+            if parent_form:
+                return self._parse_form(parent_form, base_url)
+            
+            # نبني form افتراضي
+            fields = []
+            all_inputs = soup.find_all('input')
+            for inp in all_inputs:
+                name = inp.get('name', '') or inp.get('id', '')
+                itype = inp.get('type', 'text').lower()
+                if not name:
+                    continue
+                label = ""
+                lbl = inp.find_previous('label')
+                if lbl:
+                    label = lbl.get_text().strip()
+                fields.append(LoginField(
+                    name=name, type=self._detect_type(name, itype),
+                    label=label or inp.get('placeholder', name),
+                    placeholder=inp.get('placeholder', ''),
+                    value=inp.get('value', '')
+                ))
+            
+            if fields:
+                return {'action': base_url, 'method': 'POST', 'fields': fields,
+                        'csrf_token': None, 'csrf_name': ''}
         
-        # استخراج action و method
-        action = login_form.get('action', '') if hasattr(login_form, 'get') else ''
-        method = login_form.get('method', 'POST').upper() if hasattr(login_form, 'get') else 'POST'
+        return None
+    
+    async def _extract_form_playwright(self, login_url: str) -> Optional[Dict]:
+        """Playwright browser extraction"""
+        try:
+            from playwright.async_api import async_playwright
+        except ImportError:
+            return None
         
-        if action:
-            action_url = urljoin(base_url, action)
-        else:
-            action_url = base_url
+        try:
+            async with async_playwright() as p:
+                browser = await p.chromium.launch(headless=True)
+                page = await browser.new_page()
+                await page.goto(login_url, wait_until="networkidle", timeout=20000)
+                await page.wait_for_timeout(2000)
+                
+                fields = []
+                
+                # البحث عن inputs
+                inputs = await page.query_selector_all('input')
+                for inp in inputs:
+                    name = await inp.get_attribute('name') or await inp.get_attribute('id') or ''
+                    itype = await inp.get_attribute('type') or 'text'
+                    placeholder = await inp.get_attribute('placeholder') or ''
+                    value = await inp.get_attribute('value') or ''
+                    
+                    if not name:
+                        continue
+                    
+                    fields.append(LoginField(
+                        name=name, type=self._detect_type(name, itype.lower()),
+                        label=placeholder or name, placeholder=placeholder,
+                        value=value
+                    ))
+                
+                # البحث عن CSRF
+                csrf = await page.evaluate("""
+                    () => {
+                        const meta = document.querySelector('meta[name="csrf-token"]');
+                        if (meta) return meta.getAttribute('content');
+                        const input = document.querySelector('input[name*="csrf" i], input[name="_token"]');
+                        return input ? input.value : null;
+                    }
+                """)
+                
+                await browser.close()
+                
+                if fields:
+                    return {'action': login_url, 'method': 'POST', 'fields': fields,
+                            'csrf_token': csrf, 'csrf_name': 'csrf_token' if csrf else ''}
+        except:
+            pass
         
-        # استخراج CSRF token
+        return None
+    
+    def _extract_form_generic(self, html: str, base_url: str) -> Optional[Dict]:
+        """Generic regex-based extraction - last resort"""
+        # البحث عن input fields باستخدام regex
+        input_pattern = re.compile(r'<input[^>]+(?:name|id)=["\']([^"\']+)["\'][^>]*>', re.I)
+        type_pattern = re.compile(r'type=["\']([^"\']+)["\']', re.I)
+        placeholder_pattern = re.compile(r'placeholder=["\']([^"\']*)["\']', re.I)
+        
+        fields = []
+        for match in input_pattern.finditer(html):
+            name = match.group(1)
+            input_html = match.group(0)
+            itype_match = type_pattern.search(input_html)
+            itype = itype_match.group(1).lower() if itype_match else 'text'
+            placeholder_match = placeholder_pattern.search(input_html)
+            placeholder = placeholder_match.group(1) if placeholder_match else ''
+            
+            if name and itype in ['email', 'password', 'text']:
+                fields.append(LoginField(
+                    name=name, type=self._detect_type(name, itype),
+                    label=placeholder or name, placeholder=placeholder
+                ))
+        
+        if fields:
+            return {'action': base_url, 'method': 'POST', 'fields': fields,
+                    'csrf_token': None, 'csrf_name': ''}
+        return None
+    
+    def _parse_form(self, form, base_url: str) -> Dict:
+        """Parse BeautifulSoup form"""
+        action = urljoin(base_url, form.get('action', '')) or base_url
+        method = form.get('method', 'POST').upper()
+        
         csrf_token = None
         csrf_name = ""
-        
-        csrf_patterns = ['csrf', 'token', 'authenticity_token', '_token', 'xsrf']
-        
-        # استخراج الحقول
         fields = []
         
-        all_inputs = login_form.find_all(['input', 'button']) if hasattr(login_form, 'find_all') else soup.find_all(['input', 'button'])
-        
-        for inp in all_inputs:
-            name = inp.get('name', '')
-            input_type = inp.get('type', 'text').lower()
+        for inp in form.find_all(['input', 'button']):
+            name = inp.get('name', '') or inp.get('id', '')
+            itype = inp.get('type', 'text').lower()
             
-            if not name and input_type != 'submit':
+            if not name and itype != 'submit':
                 continue
             
-            # البحث عن label
             label = ""
-            label_elem = inp.find_previous('label')
-            if label_elem:
-                label = label_elem.get_text().strip()
+            lbl = inp.find_previous('label')
+            if lbl:
+                label = lbl.get_text().strip()
             
-            placeholder = inp.get('placeholder', '')
+            fields.append(LoginField(
+                name=name or itype, type=self._detect_type(name, itype),
+                label=label or inp.get('placeholder', name),
+                placeholder=inp.get('placeholder', ''),
+                value=inp.get('value', '')
+            ))
             
-            # تحديد نوع الحقل
-            field_type = self._detect_field_type(name, input_type, placeholder, label)
-            
-            field = LoginField(
-                name=name or input_type,
-                type=field_type,
-                label=label or placeholder or name,
-                placeholder=placeholder,
-                required=inp.get('required') is not None,
-                value=inp.get('value', ''),
-                autocomplete=inp.get('autocomplete', '')
-            )
-            
-            fields.append(field)
-            
-            # كشف CSRF
             if not csrf_token:
-                for pattern in csrf_patterns:
-                    if pattern in name.lower():
+                for p in ['csrf', 'token', '_token', 'xsrf']:
+                    if p in name.lower():
                         csrf_token = inp.get('value', '')
                         csrf_name = name
                         break
         
-        # لو مفيش password field، ممكن يكون multi-step
-        has_password = any(f.type == 'password' for f in fields)
-        
-        return {
-            'action': action_url,
-            'method': method,
-            'fields': fields,
-            'csrf_token': csrf_token,
-            'csrf_name': csrf_name,
-            'has_password': has_password,
-            'is_multi_step': not has_password and len(fields) > 0,
-        }
+        return {'action': action, 'method': method, 'fields': fields,
+                'csrf_token': csrf_token, 'csrf_name': csrf_name}
     
-    def _detect_field_type(self, name: str, input_type: str, placeholder: str, label: str) -> str:
-        """تحديد نوع الحقل من اسمه ونوعه"""
-        combined = f"{name} {placeholder} {label} {input_type}".lower()
-        
-        # CAPTCHA
-        if any(w in combined for w in ['captcha', 'recaptcha', 'hcaptcha', 'g-recaptcha']):
-            return "captcha"
-        
-        # 2FA
-        if any(w in combined for w in ['2fa', 'otp', 'code', 'token', 'verification', 'authenticator']):
-            return "2fa"
-        
-        # Email
-        if input_type == 'email' or 'email' in combined:
-            return "email"
-        
-        # Password
-        if input_type == 'password' or 'password' in combined:
-            return "password"
-        
-        # Hidden
-        if input_type == 'hidden':
-            return "hidden"
-        
-        # Submit
-        if input_type == 'submit':
-            return "submit"
-        
-        # Username
-        if any(w in combined for w in ['username', 'user', 'login', 'account']):
-            return "text"
-        
-        # Default
-        return input_type if input_type in ['text', 'number', 'tel', 'url'] else "text"
+    def _detect_type(self, name: str, itype: str) -> str:
+        combined = f"{name} {itype}".lower()
+        if 'captcha' in combined: return "captcha"
+        if any(w in combined for w in ['2fa', 'otp', 'code', 'token']): return "2fa"
+        if itype == 'email': return "email"
+        if itype == 'password': return "password"
+        if itype == 'hidden': return "hidden"
+        if itype == 'submit': return "submit"
+        return "text"
     
-    async def _submit_login(
-        self, action_url: str, method: str, form_data: Dict, referer: str
-    ) -> Dict:
-        """إرسال نموذج تسجيل الدخول"""
+    async def _submit(self, action: str, method: str, data: Dict, referer: str) -> Dict:
         try:
-            headers = {
-                "Referer": referer,
-                "Origin": f"{urlparse(referer).scheme}://{urlparse(referer).netloc}",
-                "Content-Type": "application/x-www-form-urlencoded",
-            }
+            headers = {"Referer": referer, "Content-Type": "application/x-www-form-urlencoded"}
             
             if method == "POST":
-                response = await self.client.post(action_url, data=form_data, headers=headers)
+                r = await self.client.post(action, data=data, headers=headers)
             else:
-                response = await self.client.get(action_url, params=form_data, headers=headers)
+                r = await self.client.get(action, params=data, headers=headers)
             
-            # تحليل النتيجة
-            result = {
-                'success': False,
-                'cookies': {},
-                'headers': {},
-                'tokens': {},
-                'error': '',
-                'next_step': False,
-                'response_url': str(response.url),
-                'status_code': response.status_code,
-            }
+            result = {'success': False, 'cookies': {}, 'headers': dict(r.headers), 'tokens': {},
+                      'error': '', 'next_step': False}
             
-            # جمع cookies
-            for cookie in response.cookies:
-                result['cookies'][cookie.name] = cookie.value
+            for c in r.cookies:
+                result['cookies'][c.name] = c.value
             
-            # جمع tokens من response
-            result['tokens'] = self._extract_tokens(response.text, dict(response.headers))
-            result['headers'] = dict(response.headers)
+            result['tokens'] = self._extract_tokens(r.text, dict(r.headers))
             
-            # تحديد النجاح
-            if response.status_code in [200, 302, 303]:
-                # فحص لو تم تحويلنا لصفحة تانية
-                if str(response.url) != action_url:
-                    # تم التحويل - غالباً نجاح
-                    result['success'] = True
-                
-                # فحص لو فيه welcome/dashboard في الصفحة
-                page_text = response.text.lower()
-                success_indicators = ['welcome', 'dashboard', 'logout', 'sign out', 'account', 'profile']
-                if any(w in page_text for w in success_indicators):
-                    result['success'] = True
-                
-                # فحص رسائل الخطأ
-                error_indicators = ['invalid', 'incorrect', 'wrong', 'error', 'failed', 'not found']
-                for indicator in error_indicators:
-                    if indicator in page_text:
-                        # استخراج رسالة الخطأ
-                        result['error'] = self._extract_error_message(response.text)
-                        result['success'] = False
-                        break
-                
-                # فحص multi-step (مثلاً: تم إرسال رمز تأكيد)
-                multi_step_indicators = ['verify', 'confirm', 'code', 'check your email', '2fa', 'two-factor']
-                if any(w in page_text for w in multi_step_indicators):
-                    result['next_step'] = True
+            text = r.text.lower()
+            if any(w in text for w in ['welcome', 'dashboard', 'logout', 'sign out', 'account']):
+                result['success'] = True
+            elif str(r.url) != action:
+                result['success'] = True
+            
+            if any(w in text for w in ['verify', 'confirm', 'code', '2fa', 'two-factor']):
+                result['next_step'] = True
+            
+            for w in ['invalid', 'incorrect', 'wrong', 'error']:
+                if w in text:
+                    result['success'] = False
+                    result['error'] = f"Server returned '{w}'"
+                    break
             
             return result
-            
         except Exception as e:
-            logger.error(f"Login submit failed: {e}")
             return {'success': False, 'error': str(e)}
     
-    def _extract_tokens(self, html: str, headers: Dict) -> Dict[str, str]:
-        """استخراج tokens من الاستجابة"""
+    def _extract_tokens(self, html: str, headers: Dict) -> Dict:
         tokens = {}
-        
-        # Bearer token من headers
-        auth = headers.get('authorization', '') or headers.get('www-authenticate', '')
-        if 'bearer' in auth.lower():
-            tokens['bearer'] = auth.replace('Bearer ', '').replace('bearer ', '')
-        
-        # JWT من html
-        jwt_pattern = r'eyJ[a-zA-Z0-9_-]+\.[a-zA-Z0-9_-]+\.[a-zA-Z0-9_-]+'
-        jwt_matches = re.findall(jwt_pattern, html)
-        if jwt_matches:
-            tokens['jwt'] = jwt_matches[0]
-        
-        # CSRF token من html
-        csrf_patterns = [
-            r'<meta[^>]+name=["\']csrf-token["\'][^>]+content=["\']([^"\']+)["\']',
-            r'name=["\']csrf[^"\']*["\'][^>]+value=["\']([^"\']+)["\']',
-        ]
-        for pattern in csrf_patterns:
-            match = re.search(pattern, html, re.I)
-            if match:
-                tokens['csrf'] = match.group(1)
-                break
-        
-        # API key
-        api_patterns = [r'api[_-]?key["\']?\s*[:=]\s*["\']([^"\']+)["\']']
-        for pattern in api_patterns:
-            match = re.search(pattern, html, re.I)
-            if match:
-                tokens['api_key'] = match.group(1)
-                break
-        
+        jwt_match = re.search(r'eyJ[a-zA-Z0-9_-]+\.[a-zA-Z0-9_-]+\.[a-zA-Z0-9_-]+', html)
+        if jwt_match:
+            tokens['jwt'] = jwt_match.group(0)
+        csrf_match = re.search(r'<meta[^>]+name=["\']csrf[^"\']*["\'][^>]+content=["\']([^"\']+)', html, re.I)
+        if csrf_match:
+            tokens['csrf'] = csrf_match.group(1)
         return tokens
     
-    def _extract_error_message(self, html: str) -> str:
-        """استخراج رسالة الخطأ من الصفحة"""
-        soup = BeautifulSoup(html, 'html.parser')
-        
-        # البحث عن عناصر الخطأ
-        error_selectors = [
-            '.error', '.alert', '.alert-danger', '.alert-error',
-            '[role="alert"]', '.message-error', '.form-error',
-            '.invalid-feedback', '.text-danger', '.text-error'
-        ]
-        
-        for selector in error_selectors:
-            elem = soup.select_one(selector)
-            if elem:
-                return elem.get_text().strip()[:200]
-        
-        # البحث بالنص
-        error_patterns = [
-            r'(?:error|invalid|incorrect|wrong)[:\s]+([^<\n]{10,200})',
-            r'<[^>]+class="[^"]*error[^"]*"[^>]*>([^<]{10,200})<',
-        ]
-        
-        for pattern in error_patterns:
-            match = re.search(pattern, html, re.I)
-            if match:
-                return match.group(1).strip()
-        
-        return "Login failed - check credentials"
-    
-    async def _handle_multi_step(self, result: Dict, form_data: Dict, login_url: str) -> Optional[LoginSession]:
-        """التعامل مع multi-step login"""
-        print(f"\n🔄 Multi-step login detected!")
-        print(f"   Response URL: {result.get('response_url', 'unknown')}")
-        
-        # هنا ممكن نضيف منطق للتعامل مع:
-        # - Email verification (check your email)
-        # - 2FA code
-        # - Security questions
-        # - CAPTCHA
-        
-        print(f"\n⚠️  Multi-step login needs manual intervention")
-        print(f"   Please complete the login in your browser,")
-        print(f"   then provide the session cookie:")
-        
-        session_cookie = input(f"\n   📋 Paste session cookie (name=value): ")
-        
-        if session_cookie:
-            name, value = session_cookie.split('=', 1) if '=' in session_cookie else ('session', session_cookie)
-            self.session.cookies[name] = value
-            self.session.session_id = f"manual_{datetime.now().strftime('%Y%m%d%H%M%S')}"
-            
-            path = self.session.save()
-            print(f"✅ Session saved manually: {path}")
-            return self.session
-        
-        return None
-    
     def load_session(self, session_id: str) -> Optional[LoginSession]:
-        """تحميل جلسة محفوظة"""
-        filepath = f"sessions/session_{session_id}.json"
-        return LoginSession.load(filepath)
+        return LoginSession.load(f"sessions/session_{session_id}.json")
     
     def list_sessions(self) -> List[str]:
-        """قائمة الجلسات المحفوظة"""
         if not os.path.exists("sessions"):
             return []
-        
-        sessions = []
-        for f in os.listdir("sessions"):
-            if f.endswith('.json'):
-                sessions.append(f.replace('session_', '').replace('.json', ''))
-        
-        return sessions
+        return [f.replace('session_', '').replace('.json', '') for f in os.listdir("sessions") if f.endswith('.json')]
 
 
-# نسخة عالمية
 _interactive_login = None
 
 def get_interactive_login() -> InteractiveLogin:

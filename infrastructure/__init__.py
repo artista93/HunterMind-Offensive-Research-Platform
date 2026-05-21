@@ -1,5 +1,3 @@
-# infrastructure/__init__.py
-
 """
 Infrastructure Module - طبقة البنية التحتية
 """
@@ -34,7 +32,7 @@ from .networking import (
 # استيراد من auth
 from .auth import (
     AuthManager, AuthType, AuthStatus, AuthCredentials,
-    AuthSession, LoginFormDetector, get_auth_manager,
+    AuthSession, LoginFormDetector, BrowserFingerprint, get_auth_manager,
 )
 
 # استيراد من runtime
@@ -82,7 +80,7 @@ __all__ = [
     'TrafficAnalyzer', 'get_traffic_analyzer',
     # auth
     'AuthManager', 'AuthType', 'AuthStatus', 'AuthCredentials',
-    'AuthSession', 'LoginFormDetector', 'get_auth_manager',
+    'AuthSession', 'LoginFormDetector', 'BrowserFingerprint', 'get_auth_manager',
     # runtime
     'AsyncRuntime', 'get_async_runtime',
     'CleanupManager', 'get_cleanup_manager',

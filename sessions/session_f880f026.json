@@ -1,0 +1,16 @@
+{
+  "url": "https://tryhackme.com",
+  "cookies": {
+    "\"connect.sid": "s%3AkkxawYYUk0zEPELccpZfsKfXRSsYtEIp.Fx3zgC0FEANHF5fMN6PXz4YvyR1vUf7BwcKYTK0xqm4;",
+    "_csrf": "HBi7zHzQBF_SOq26pYcqzqVp;",
+    "thm-ud": "%7B%22userId%22%3A%226a0cf2b1aa43ce658b3e4b8d%22%7D\""
+  },
+  "headers": {
+    "X-CSRF-Token": "HBi7zHzQBF_SOq26pYcqzqVp;"
+  },
+  "tokens": {},
+  "csrf_token": "HBi7zHzQBF_SOq26pYcqzqVp;",
+  "session_id": "f880f026",
+  "created_at": "2026-05-20T00:58:13.767015",
+  "user_agent": ""
+}

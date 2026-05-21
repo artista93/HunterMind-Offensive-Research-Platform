@@ -5,6 +5,7 @@ CLI Runner - واجهة سطر الأوامر الاحترافية
 import argparse
 import asyncio
 import sys
+import re
 from typing import List
 from datetime import datetime
 
@@ -37,10 +38,12 @@ class CLIRunner:
             "scan": self.cmd_scan,
             "smart": self.cmd_smart,
             "crawl": self.cmd_crawl,
+            "analyze": self.cmd_analyze,
             # المصادقة
             "login": self.cmd_login,
             "register": self.cmd_register,
             "sessions": self.cmd_sessions,
+            "cookies": self.cmd_cookies,
             "full": self.cmd_full,
             # النظام
             "status": self.cmd_status,
@@ -173,19 +176,29 @@ class CLIRunner:
     async def cmd_smart(self, args: List[str]):
         """🧠 فحص ذكي - يفهم الموقع قبل الفحص"""
         if not args:
-            print("Usage: smart <url> [--depth 2] [--max-pages 10]")
+            print("Usage: smart <url> [--depth 2] [--max-pages 10] [--session ID]")
             print("\n  Smart scan: extracts real forms, links, and APIs before scanning")
             return
         
         url = args[0]
         depth = 2
         max_pages = 10
+        session_id = None
         
         for i, arg in enumerate(args):
             if arg == "--depth" and i + 1 < len(args):
                 depth = int(args[i + 1])
             if arg == "--max-pages" and i + 1 < len(args):
                 max_pages = int(args[i + 1])
+            if arg == "--session" and i + 1 < len(args):
+                session_id = args[i + 1]
+        
+        # تحميل الجلسة
+        if session_id:
+            print(f"🔐 Loading session: {session_id}")
+        elif self._active_session:
+            session_id = self._active_session
+            print(f"🔐 Using active session: {session_id}")
         
         print(f"\n{Color.BRIGHT_CYAN}🧠 Starting SMART scan on {url}{Color.RESET}")
         print(f"{'='*60}\n")
@@ -210,6 +223,53 @@ class CLIRunner:
                 sev = v.get('severity', 'INFO')
                 severity_color = Color.RED if sev in ['CRITICAL', 'HIGH'] else Color.YELLOW
                 print(f"   {severity_color}[{sev}]{Color.RESET} {v.get('type', '?')} - {v.get('url', '')[:60]}")
+    
+    async def cmd_analyze(self, args: List[str]):
+        """🔍 تحليل شامل للموقع قبل الفحص (Pre-Scan Analysis - 7 خطوات)"""
+        if not args:
+            print("Usage: analyze <url> [--no-ports] [--no-files]")
+            print("\n  Pre-scan site analysis (7 steps):")
+            print("  ┌─────────────────────────────────────────────┐")
+            print("  │ 1. 📡 Connectivity Check                    │")
+            print("  │ 2. 🛡️  WAF/CDN Detection                    │")
+            print("  │ 3. 🔐 Auth Discovery                        │")
+            print("  │ 4. 🧭 Site Structure (robots.txt, sitemap)  │")
+            print("  │ 5. 🔍 Technology Fingerprinting             │")
+            print("  │ 6. 📡 Service Discovery (open ports)        │")
+            print("  │ 7. 🎯 Attack Surface Analysis               │")
+            print("  └─────────────────────────────────────────────┘")
+            print("\n  Options:")
+            print("    --no-ports   Skip port scanning")
+            print("    --no-files   Skip sensitive file checks")
+            print("\n  Examples:")
+            print("    analyze https://example.com")
+            print("    analyze https://example.com --no-ports")
+            return
+        
+        url = args[0]
+        scan_ports = "--no-ports" not in args
+        check_files = "--no-files" not in args
+        
+        from offensive.recon.site_analyzer import get_site_analyzer
+        
+        analyzer = get_site_analyzer()
+        report = await analyzer.analyze(url, scan_ports=scan_ports, check_files=check_files)
+        
+        # عرض التوصيات
+        if report.recommendations:
+            print(f"\n{Color.YELLOW}💡 Recommendations for scanning:{Color.RESET}")
+            for r in report.recommendations:
+                print(f"   • {r}")
+        
+        # اقتراح الخطوة التالية
+        print(f"\n{Color.CYAN}📋 Next steps:{Color.RESET}")
+        if report.waf and report.waf.waf_detected:
+            print(f"   • WAF detected ({report.waf.waf_name}) - use stealth mode or provide cookies")
+        if report.auth and report.auth.auth_required:
+            print(f"   • Auth required - use: {Color.CYAN}cookies <url> <name=value>{Color.RESET}")
+            print(f"     or: {Color.CYAN}login {url}{Color.RESET}")
+        print(f"   • Start scan: {Color.CYAN}smart {url}{Color.RESET}")
+        print(f"   • Full scan: {Color.CYAN}scan {url}{Color.RESET}")
     
     async def cmd_crawl(self, args: List[str]):
         """زحف الموقع لاكتشاف جميع الصفحات"""
@@ -245,6 +305,7 @@ class CLIRunner:
             print("Usage: login <url> [--username <u>] [--password <p>]")
             print("\n  Interactive login wizard:")
             print("  - Auto-detects form fields (email, password, CSRF, 2FA, CAPTCHA)")
+            print("  - Supports 4 detection methods: BS4 → Playwright → Regex → Manual")
             print("  - Asks for missing credentials interactively")
             print("  - Saves session for later scanning")
             print("\n  Examples:")
@@ -271,10 +332,95 @@ class CLIRunner:
             self._active_session = session.session_id
             print(f"\n{Color.BRIGHT_GREEN}✅ Session saved & activated!{Color.RESET}")
             print(f"   Session ID: {Color.CYAN}{session.session_id}{Color.RESET}")
-            print(f"   Now use: {Color.CYAN}scan <url>{Color.RESET} to scan with this session")
-            print(f"   Or: {Color.CYAN}sessions{Color.RESET} to list all saved sessions")
+            print(f"   Now use: {Color.CYAN}scan <url>{Color.RESET} or {Color.CYAN}smart <url>{Color.RESET}")
         else:
             print(f"\n{Color.RED}❌ Login failed. Check URL and credentials.{Color.RESET}")
+    
+    async def cmd_cookies(self, args: List[str]):
+        """🍪 حفظ كوكيز مباشرة من المتصفح"""
+        if not args:
+            print("Usage: cookies <url> <name=value> [name=value ...]")
+            print("\n  Paste cookies directly from browser Developer Tools")
+            print("  Supports multiple cookies separated by spaces or semicolons")
+            print("\n  Examples:")
+            print("    cookies https://example.com session=abc123 token=xyz789")
+            print('    cookies https://example.com "session=abc123; csrf=xyz; token=jwt..."')
+            print("\n  After saving, use: smart <url> to scan with the session")
+            return
+        
+        url = args[0]
+        cookie_data = args[1:]
+        
+        # لو كل الكوكيز في string واحد مفصول بـ ;
+        if len(cookie_data) == 1 and ';' in cookie_data[0]:
+            cookie_data = [c.strip() for c in cookie_data[0].split(';')]
+        
+        # تحليل الكوكيز
+        cookies = {}
+        for item in cookie_data:
+            if '=' in item:
+                name, value = item.split('=', 1)
+                cookies[name.strip()] = value.strip()
+            else:
+                print(f"   ⚠️  Skipping invalid cookie: {item}")
+        
+        if not cookies:
+            print(f"❌ No valid cookies found")
+            return
+        
+        print(f"\n{Color.BRIGHT_CYAN}🍪 Saving Cookies{Color.RESET}")
+        print(f"{'='*50}")
+        print(f"   URL: {url}")
+        print(f"   Cookies: {len(cookies)} items")
+        
+        for name, value in cookies.items():
+            masked = value[:25] + "..." if len(value) > 25 else value
+            print(f"     {name}={masked}")
+        
+        # حفظ الجلسة
+        from infrastructure.auth.interactive_login import LoginSession, get_interactive_login
+        import uuid
+        
+        login_manager = get_interactive_login()
+        
+        session_id = str(uuid.uuid4())[:8]
+        session = LoginSession(
+            url=url,
+            cookies=cookies,
+            session_id=session_id,
+            created_at=datetime.now().isoformat(),
+        )
+        
+        # استخراج tokens تلقائياً من الكوكيز
+        for name, value in cookies.items():
+            # CSRF token
+            if 'csrf' in name.lower():
+                session.csrf_token = value
+                session.headers['X-CSRF-Token'] = value
+            
+            # Session cookie
+            if name.lower() in ['session', 'sessionid', 'connect.sid', 'phpsessid', 'jsessionid']:
+                session.headers['Cookie'] = f"{name}={value}"
+            
+            # JWT token
+            jwt_match = re.search(r'eyJ[a-zA-Z0-9_-]+\.[a-zA-Z0-9_-]+\.[a-zA-Z0-9_-]+', value)
+            if jwt_match:
+                session.tokens['jwt'] = jwt_match.group(0)
+                session.headers['Authorization'] = f"Bearer {jwt_match.group(0)}"
+            
+            # أي token
+            if 'token' in name.lower() or 'auth' in name.lower():
+                session.tokens[name] = value
+        
+        session_path = session.save()
+        self._active_session = session_id
+        
+        print(f"\n{Color.BRIGHT_GREEN}✅ Cookies saved!{Color.RESET}")
+        print(f"   Session ID: {Color.CYAN}{session_id}{Color.RESET}")
+        print(f"   Tokens found: {list(session.tokens.keys()) if session.tokens else 'none'}")
+        print(f"   CSRF token: {'✅' if session.csrf_token else '❌'}")
+        print(f"   Saved to: {session_path}")
+        print(f"\n   Use: {Color.CYAN}smart {url} --session {session_id}{Color.RESET}")
     
     async def cmd_sessions(self, args: List[str]):
         """📋 عرض الجلسات المحفوظة"""
@@ -285,7 +431,7 @@ class CLIRunner:
         
         if not sessions:
             print(f"\n📭 No saved sessions")
-            print(f"   Use: login <url> to create a session")
+            print(f"   Create one with: login <url> or cookies <url> <name=value>")
             return
         
         print(f"\n{Color.BRIGHT_CYAN}📋 Saved Sessions{Color.RESET}")
@@ -294,7 +440,9 @@ class CLIRunner:
             marker = " ← ACTIVE" if s == self._active_session else ""
             print(f"   {Color.CYAN}{s}{Color.RESET}{marker}")
         
-        print(f"\n   Use: scan <url> --session <ID> to use a session")
+        if self._active_session:
+            print(f"\n   Active: {Color.CYAN}{self._active_session}{Color.RESET}")
+        print(f"\n   Use: scan <url> --session <ID>")
     
     async def cmd_register(self, args: List[str]):
         """إنشاء حساب جديد (تلقائي)"""
@@ -361,13 +509,11 @@ class CLIRunner:
         print(f"   Registered accounts: {status.get('total_accounts', 0)}")
         
         if self._active_session:
-            print(f"   Active session: {Color.CYAN}{self._active_session}{Color.RESET}")
+            print(f"   {Color.CYAN}Active session: {self._active_session}{Color.RESET}")
         
-        # WorldState
         ws = status.get('world_state', {})
         if ws and ws.get('phase') != 'not_initialized':
             print(f"   WorldState phase: {ws.get('phase', 'N/A')}")
-            print(f"   Endpoints: {ws.get('endpoints', 0)}")
         print("")
     
     async def cmd_list(self, args: List[str]):
@@ -459,6 +605,9 @@ class CLIRunner:
 ║                    HUNTERMIND CLI COMMANDS                        ║
 ╠══════════════════════════════════════════════════════════════════╣
 ║                                                                    ║
+║  {Color.BRIGHT_WHITE}PRE-SCAN ANALYSIS{Color.RESET}                                                 ║
+║    analyze <url> [--no-ports] [--no-files]   - 7-step analysis 🔍 ║
+║                                                                    ║
 ║  {Color.BRIGHT_WHITE}CRAWLING & SCANNING{Color.RESET}                                             ║
 ║    scan <url> [--depth 3] [--max-pages 50]  - Full scan           ║
 ║    smart <url> [--depth 2] [--max-pages 10] - Smart scan 🧠       ║
@@ -466,6 +615,7 @@ class CLIRunner:
 ║                                                                    ║
 ║  {Color.BRIGHT_WHITE}AUTHENTICATION{Color.RESET}                                                   ║
 ║    login <url> [--username u] [--password p]  - Interactive login 🔐║
+║    cookies <url> <name=value...>              - Save cookies 🍪    ║
 ║    register <url> [--username u] [--password p] - Auto register   ║
 ║    sessions                                   - List saved sessions║
 ║    full <reg_url> <target>                   - Register → Scan    ║
@@ -480,8 +630,10 @@ class CLIRunner:
 ║                                                                    ║
 ╚══════════════════════════════════════════════════════════════════╝
 {Color.BRIGHT_GREEN}✅ Connected to REAL orchestrator & scanners!{Color.RESET}
-{Color.YELLOW}🧠 Smart scan available: extracts real forms, links & APIs{Color.RESET}
+{Color.YELLOW}🧠 Smart scan: extracts real forms, links & APIs{Color.RESET}
 {Color.CYAN}🔐 Interactive login: auto-detects form fields{Color.RESET}
+{Color.MAGENTA}🍪 Cookies: paste directly from browser Developer Tools{Color.RESET}
+{Color.BRIGHT_CYAN}🔍 Analyze: 7-step pre-scan site analysis{Color.RESET}
 """)
     
     async def cmd_exit(self, args: List[str]):
