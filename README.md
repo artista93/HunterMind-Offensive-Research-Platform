@@ -367,18 +367,7 @@ Code Standards
 · Tests for all new features
 · Follow dependency direction (no circular imports)
 
----
 
-🛡️ Responsible Disclosure
-
-If you discover a vulnerability in this platform:
-
-1. Do NOT exploit it
-2. Report it immediately to: artistajaafari@gmail.com
-3. Allow reasonable time for response
-4. Do not disclose publicly until fixed
-
----
 
 📄 License
 
